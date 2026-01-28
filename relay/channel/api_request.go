@@ -339,8 +339,13 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		return nil, errors.New("resp is nil")
 	}
 
-	_ = req.Body.Close()
-	_ = c.Request.Body.Close()
+	// 只在 Body 不为 nil 时关闭
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
+	if c.Request.Body != nil {
+		_ = c.Request.Body.Close()
+	}
 	return resp, nil
 }
 

@@ -31,6 +31,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/siliconflow"
 	"github.com/QuantumNous/new-api/relay/channel/submodel"
 	taskali "github.com/QuantumNous/new-api/relay/channel/task/ali"
+	"github.com/QuantumNous/new-api/relay/channel/task/cqtai"
 	taskdoubao "github.com/QuantumNous/new-api/relay/channel/task/doubao"
 	taskGemini "github.com/QuantumNous/new-api/relay/channel/task/gemini"
 	"github.com/QuantumNous/new-api/relay/channel/task/hailuo"
@@ -138,6 +139,8 @@ func GetTaskAdaptor(platform constant.TaskPlatform) channel.TaskAdaptor {
 	//	return &aiproxy.Adaptor{}
 	case constant.TaskPlatformSuno:
 		return &suno.TaskAdaptor{}
+	case constant.TaskPlatformCqtai:
+		return &cqtai.TaskAdaptor{}
 	}
 	if channelType, err := strconv.ParseInt(string(platform), 10, 64); err == nil {
 		switch channelType {

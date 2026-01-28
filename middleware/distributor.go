@@ -215,6 +215,17 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 		}
 		c.Set("platform", string(constant.TaskPlatformSuno))
 		c.Set("relay_mode", relayMode)
+	} else if strings.Contains(c.Request.URL.Path, "/api/cqt/") {
+		relayMode := relayconstant.Path2RelayCqtai(c.Request.Method, c.Request.URL.Path)
+		// Cqtai 的查询接口也需要转发到上游 API，所以需要选择渠道
+		// 查询任务使用 suno_fetch 模型，提交任务使用 suno_music 模型
+		if relayMode == relayconstant.RelayModeCqtaiFetch {
+			modelRequest.Model = "suno_fetch"
+		} else {
+			modelRequest.Model = "suno_music"
+		}
+		c.Set("platform", string(constant.TaskPlatformCqtai))
+		c.Set("relay_mode", relayMode)
 	} else if strings.Contains(c.Request.URL.Path, "/v1/videos/") && strings.HasSuffix(c.Request.URL.Path, "/remix") {
 		relayMode := relayconstant.RelayModeVideoSubmit
 		c.Set("relay_mode", relayMode)

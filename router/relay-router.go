@@ -172,6 +172,16 @@ func SetRelayRouter(router *gin.Engine) {
 		relaySunoRouter.GET("/fetch/:id", controller.RelayTask)
 	}
 
+	// Cqtai - 直接代理原始API路径
+	relayCqtaiRouter := router.Group("/api/cqt")
+	relayCqtaiRouter.Use(middleware.TokenAuth(), middleware.Distribute())
+	{
+		// POST https://api.cqtai.com/api/cqt/generator/suno
+		relayCqtaiRouter.POST("/generator/suno", controller.RelayTask)
+		// GET https://api.cqtai.com/api/cqt/v2/sunoinfo
+		relayCqtaiRouter.GET("/v2/sunoinfo", controller.RelayTask)
+	}
+
 	relayGeminiRouter := router.Group("/v1beta")
 	relayGeminiRouter.Use(middleware.TokenAuth())
 	relayGeminiRouter.Use(middleware.ModelRequestRateLimit())

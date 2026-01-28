@@ -40,6 +40,9 @@ const (
 	RelayModeSunoFetchByID
 	RelayModeSunoSubmit
 
+	RelayModeCqtaiFetch
+	RelayModeCqtaiSubmit
+
 	RelayModeVideoFetchByID
 	RelayModeVideoSubmit
 
@@ -145,6 +148,18 @@ func Path2RelaySuno(method, path string) int {
 		relayMode = RelayModeSunoFetchByID
 	} else if strings.Contains(path, "/submit/") {
 		relayMode = RelayModeSunoSubmit
+	}
+	return relayMode
+}
+
+func Path2RelayCqtai(method, path string) int {
+	relayMode := RelayModeUnknown
+	// GET /api/cqt/v2/sunoinfo - 查询任务
+	if method == http.MethodGet && strings.Contains(path, "/api/cqt/v2/sunoinfo") {
+		relayMode = RelayModeCqtaiFetch
+	} else if method == http.MethodPost && strings.Contains(path, "/api/cqt/generator/suno") {
+		// POST /api/cqt/generator/suno - 提交任务
+		relayMode = RelayModeCqtaiSubmit
 	}
 	return relayMode
 }
