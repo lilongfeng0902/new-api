@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"strconv"
@@ -218,11 +221,27 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 	} else if strings.Contains(c.Request.URL.Path, "/api/cqt/") {
 		relayMode := relayconstant.Path2RelayCqtai(c.Request.Method, c.Request.URL.Path)
 		// Cqtai 的查询接口也需要转发到上游 API，所以需要选择渠道
-		// 查询任务使用 suno_fetch 模型，提交任务使用 suno_music 模型
+		// 查询任务使用 suno_fetch 模型，提交任务根据 task 类型选择模型
 		if relayMode == relayconstant.RelayModeCqtaiFetch {
 			modelRequest.Model = "suno_fetch"
 		} else {
-			modelRequest.Model = "suno_music"
+			// 读取请求体判断任务类型：lyrics 或 music
+			modelName := "suno_music" // 默认为 music
+			if c.Request.Method == http.MethodPost {
+				body, err := io.ReadAll(c.Request.Body)
+				if err == nil {
+					// 恢复请求体供后续使用
+					c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+					// 解析请求体获取 task 类型
+					var reqBody map[string]interface{}
+					if json.Unmarshal(body, &reqBody) == nil {
+						if taskType, ok := reqBody["task"].(string); ok && taskType == "lyrics" {
+							modelName = "suno_lyrics"
+						}
+					}
+				}
+			}
+			modelRequest.Model = modelName
 		}
 		c.Set("platform", string(constant.TaskPlatformCqtai))
 		c.Set("relay_mode", relayMode)
