@@ -548,3 +548,22 @@ func shouldRetryTaskRelay(c *gin.Context, channelId int, taskErr *dto.TaskError,
 	}
 	return true
 }
+
+// RelayProxy 直接代理请求，不经过任务系统
+// 用于简单的API转发，如 Cqtai 的查询接口
+func RelayProxy(c *gin.Context) {
+	relayInfo, err := relaycommon.GenRelayInfo(c, types.RelayFormatTask, nil, nil)
+	if err != nil {
+		return
+	}
+
+	// 直接调用 relay handler
+	newAPIError := relay.CqtaiProxyHandler(c, relayInfo)
+	if newAPIError != nil {
+		logger.LogError(c, fmt.Sprintf("relay proxy error: %s", newAPIError.Error()))
+		newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), c.GetString(common.RequestIdKey)))
+		c.JSON(newAPIError.StatusCode, gin.H{
+			"error": newAPIError.ToOpenAIError(),
+		})
+	}
+}
