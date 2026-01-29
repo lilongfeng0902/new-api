@@ -213,83 +213,164 @@ func updateCqtaiTaskAll(ctx context.Context, channelId int, taskIds []string, ta
 			"progress":    "100%",
 		})
 		if err != nil {
-			common.SysLog(fmt.Sprintf("UpdateMidjourneyTask error2: %v", err))
+			common.SysLog(fmt.Sprintf("UpdateCqtaiTask error2: %v", err))
 		}
 		return err
 	}
+
 	adaptor := relay.GetTaskAdaptor(constant.TaskPlatformCqtai)
 	if adaptor == nil {
 		return errors.New("adaptor not found")
 	}
-	proxy := channel.GetSetting().Proxy
-	resp, err := adaptor.FetchTask(*channel.BaseURL, channel.Key, map[string]any{
-		"ids": taskIds,
-	}, proxy)
-	if err != nil {
-		common.SysLog(fmt.Sprintf("Get Task Do req error: %v", err))
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		logger.LogError(ctx, fmt.Sprintf("Get Task status code: %d", resp.StatusCode))
-		return errors.New(fmt.Sprintf("Get Task status code: %d", resp.StatusCode))
-	}
-	defer resp.Body.Close()
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		common.SysLog(fmt.Sprintf("Get Task parse body error: %v", err))
-		return err
-	}
-	var responseItems dto.TaskResponse[[]dto.SunoDataResponse]
-	err = json.Unmarshal(responseBody, &responseItems)
-	if err != nil {
-		logger.LogError(ctx, fmt.Sprintf("Get Task parse body error2: %v, body: %s", err, string(responseBody)))
-		return err
-	}
-	if !responseItems.IsSuccess() {
-		common.SysLog(fmt.Sprintf("渠道 #%d 未完成的任务有: %d, 成功获取到任务数: %s", channelId, len(taskIds), string(responseBody)))
-		return err
-	}
 
-	for _, responseItem := range responseItems.Data {
-		task := taskM[responseItem.TaskID]
-		if !checkTaskNeedUpdate(task, responseItem) {
+	proxy := channel.GetSetting().Proxy
+
+	// Cqtai API 不支持批量查询，需要逐个查询
+	for _, taskId := range taskIds {
+		task := taskM[taskId]
+		if task == nil {
 			continue
 		}
 
-		task.Status = lo.If(model.TaskStatus(responseItem.Status) != "", model.TaskStatus(responseItem.Status)).Else(task.Status)
-		task.FailReason = lo.If(responseItem.FailReason != "", responseItem.FailReason).Else(task.FailReason)
-		task.SubmitTime = lo.If(responseItem.SubmitTime != 0, responseItem.SubmitTime).Else(task.SubmitTime)
-		task.StartTime = lo.If(responseItem.StartTime != 0, responseItem.StartTime).Else(task.StartTime)
-		task.FinishTime = lo.If(responseItem.FinishTime != 0, responseItem.FinishTime).Else(task.FinishTime)
-		if responseItem.FailReason != "" || task.Status == model.TaskStatusFailure {
+		// 单独查询每个任务
+		resp, err := adaptor.FetchTask(*channel.BaseURL, channel.Key, map[string]any{
+			"ids": []string{taskId},
+		}, proxy)
+		if err != nil {
+			common.SysLog(fmt.Sprintf("Get Task Do req error: %v", err))
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			logger.LogError(ctx, fmt.Sprintf("Get Task status code: %d", resp.StatusCode))
+			resp.Body.Close()
+			continue
+		}
+
+		responseBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			common.SysLog(fmt.Sprintf("Get Task parse body error: %v", err))
+			continue
+		}
+
+		// Cqtai API 返回格式: { "code": 200, "msg": "success", "data": {...} } (单个对象)
+		var cqtaiResponse dto.CqtaiResponse[dto.CqtaiTaskData]
+		err = json.Unmarshal(responseBody, &cqtaiResponse)
+		if err != nil {
+			logger.LogError(ctx, fmt.Sprintf("Get Task parse body error2: %v, body: %s", err, string(responseBody)))
+			continue
+		}
+		if !cqtaiResponse.IsSuccess() || cqtaiResponse.Data.ID == "" {
+			common.SysLog(fmt.Sprintf("渠道 #%d 任务 %s 查询失败: %s", channelId, taskId, string(responseBody)))
+			continue
+		}
+
+		cqtaiTask := cqtaiResponse.Data
+
+		// 转换 Cqtai 状态到系统状态
+		newStatus := mapCqtaiStatusToSystemStatus(cqtaiTask.Status)
+		failReason := cqtaiTask.ErrorMsg
+
+		// 检查是否需要更新
+		if task.Status == newStatus && task.FailReason == failReason {
+			// 检查时间戳是否变化
+			startTime := parseCqtaiTime(cqtaiTask.CreateTime)
+			finishTime := parseCqtaiTime(cqtaiTask.CompleteTime)
+			if task.StartTime == startTime && task.FinishTime == finishTime {
+				continue
+			}
+		}
+
+		// 更新状态
+		if newStatus != "" {
+			task.Status = newStatus
+		}
+		if failReason != "" {
+			task.FailReason = failReason
+		}
+
+		// 解析时间戳
+		task.StartTime = parseCqtaiTime(cqtaiTask.CreateTime)
+		task.FinishTime = parseCqtaiTime(cqtaiTask.CompleteTime)
+
+		// 记录开始时间：如果状态变为处理中且开始时间未设置，使用创建时间
+		if task.Status == model.TaskStatusInProgress && task.StartTime == 0 {
+			task.StartTime = parseCqtaiTime(cqtaiTask.CreateTime)
+		}
+
+		// 处理失败情况
+		if task.Status == model.TaskStatusFailure || failReason != "" {
 			logger.LogInfo(ctx, task.TaskID+" 构建失败，"+task.FailReason)
 			task.Progress = "100%"
-			//err = model.CacheUpdateUserQuota(task.UserId) ?
-			if err != nil {
-				logger.LogError(ctx, "error update user quota cache: "+err.Error())
-			} else {
-				quota := task.Quota
-				if quota != 0 {
-					err = model.IncreaseUserQuota(task.UserId, quota, false)
-					if err != nil {
-						logger.LogError(ctx, "fail to increase user quota: "+err.Error())
-					}
+			if task.FinishTime == 0 {
+				task.FinishTime = time.Now().Unix()
+			}
+			quota := task.Quota
+			if quota != 0 {
+				err = model.IncreaseUserQuota(task.UserId, quota, false)
+				if err != nil {
+					logger.LogError(ctx, "fail to increase user quota: "+err.Error())
+				} else {
 					logContent := fmt.Sprintf("异步任务执行失败 %s，补偿 %s", task.TaskID, logger.LogQuota(quota))
 					model.RecordLog(task.UserId, model.LogTypeSystem, logContent)
 				}
 			}
 		}
-		if responseItem.Status == model.TaskStatusSuccess {
+
+		// 处理成功情况
+		if task.Status == model.TaskStatusSuccess {
 			task.Progress = "100%"
+			if task.FinishTime == 0 {
+				task.FinishTime = parseCqtaiTime(cqtaiTask.CompleteTime)
+			}
 		}
-		task.Data = responseItem.Data
+
+		// 更新任务数据
+		taskData, _ := json.Marshal(cqtaiTask)
+		task.Data = taskData
 
 		err = task.Update()
 		if err != nil {
-			common.SysLog("UpdateMidjourneyTask task error: " + err.Error())
+			common.SysLog("UpdateCqtaiTask task error: " + err.Error())
 		}
 	}
 	return nil
+}
+
+// mapCqtaiStatusToSystemStatus 将 Cqtai API 状态映射到系统状态
+func mapCqtaiStatusToSystemStatus(cqtaiStatus string) model.TaskStatus {
+	// Cqtai API 状态: running, succeeded, failed
+	// 系统状态: NOT_START, SUBMITTED, QUEUED, IN_PROGRESS, FAILURE, SUCCESS
+	switch cqtaiStatus {
+	case "running":
+		return model.TaskStatusInProgress
+	case "succeeded":
+		return model.TaskStatusSuccess
+	case "failed":
+		return model.TaskStatusFailure
+	default:
+		// 对于未知状态，尝试直接使用
+		return model.TaskStatus(cqtaiStatus)
+	}
+}
+
+// parseCqtaiTime 解析 Cqtai API 返回的时间字符串 (RFC3339/ISO8601) 为 Unix 时间戳
+// 注意：Cqtai API 返回的时间字符串（如 "2026-01-30 07:16:05"）是本地时间，不是 UTC
+func parseCqtaiTime(timeStr string) int64 {
+	if timeStr == "" {
+		return 0
+	}
+	// 首先尝试 RFC3339 格式（带时区信息）
+	t, err := time.Parse(time.RFC3339, timeStr)
+	if err != nil {
+		// 尝试 "2006-01-02 15:04:05" 格式（Cqtai API 使用的格式）
+		// 使用本地时区解析，因为 Cqtai API 返回的是本地时间
+		t, err = time.ParseInLocation("2006-01-02 15:04:05", timeStr, time.Local)
+		if err != nil {
+			return 0
+		}
+	}
+	return t.Unix()
 }
 
 func checkTaskNeedUpdate(oldTask *model.Task, newTask dto.SunoDataResponse) bool {

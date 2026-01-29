@@ -45,13 +45,6 @@ func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.TaskError) {
-	// 根据路径设置action
-	if strings.Contains(c.Request.URL.Path, "/generator/suno") {
-		info.Action = "MUSIC"
-	} else {
-		info.Action = "FETCH"
-	}
-
 	// 只对 POST 请求解析 body，GET 请求不需要 body
 	if c.Request.Method == http.MethodPost {
 		var requestBody map[string]any
@@ -61,6 +54,25 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 			return
 		}
 		c.Set("task_request", requestBody)
+
+		// 根据路径和请求体中的task字段设置action
+		if strings.Contains(c.Request.URL.Path, "/generator/suno") {
+			// 检查task字段：lyrics或music
+			if taskType, ok := requestBody["task"].(string); ok {
+				if taskType == "lyrics" {
+					info.Action = "LYRICS"
+				} else {
+					info.Action = "MUSIC"
+				}
+			} else {
+				info.Action = "MUSIC"
+			}
+		} else {
+			info.Action = "FETCH"
+		}
+	} else {
+		// GET 请求默认为FETCH
+		info.Action = "FETCH"
 	}
 
 	return nil
