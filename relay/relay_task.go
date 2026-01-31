@@ -241,7 +241,12 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.
 				}
 				other := make(map[string]interface{})
 				if c != nil && c.Request != nil && c.Request.URL != nil {
-					other["request_path"] = c.Request.URL.Path
+					// 精简路径，去掉 /api/cqt 前缀
+					requestPath := c.Request.URL.Path
+					if strings.HasPrefix(requestPath, "/api/cqt") {
+						requestPath = strings.TrimPrefix(requestPath, "/api/cqt")
+					}
+					other["request_path"] = requestPath
 				}
 				other["model_price"] = modelPrice
 				other["group_ratio"] = groupRatio

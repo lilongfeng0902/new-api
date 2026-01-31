@@ -5,15 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/channel/task/cqtai"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -185,5 +188,108 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 		return types.NewErrorWithStatusCode(err, "", http.StatusInternalServerError)
 	}
 
+	// 记录消费（仅对查询接口，使用 suno_fetch 模型）
+	if strings.Contains(c.Request.URL.Path, "/v2/sunoinfo") {
+		recordCqtaiFetchConsumption(c, info)
+	}
+
 	return nil
+}
+
+// recordCqtaiFetchConsumption 记录 cqtai 查询接口的消费
+func recordCqtaiFetchConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
+	modelName := "suno_fetch"
+	modelPrice, success := ratio_setting.GetModelPrice(modelName, true)
+	if !success || math.IsNaN(modelPrice) || modelPrice <= 0 {
+		defaultPrice, ok := ratio_setting.GetDefaultModelPriceMap()[modelName]
+		if !ok || math.IsNaN(defaultPrice) || defaultPrice <= 0 {
+			modelPrice = 0.01 // 默认价格
+		} else {
+			modelPrice = defaultPrice
+		}
+	}
+
+	groupRatio := ratio_setting.GetGroupRatio(info.UsingGroup)
+	if math.IsNaN(groupRatio) || groupRatio <= 0 {
+		groupRatio = 1.0 // 默认分组倍率
+	}
+
+	var ratio float64
+	userGroupRatio, hasUserGroupRatio := ratio_setting.GetGroupGroupRatio(info.UserGroup, info.UsingGroup)
+	if hasUserGroupRatio && !math.IsNaN(userGroupRatio) && userGroupRatio > 0 {
+		ratio = modelPrice * userGroupRatio
+	} else {
+		ratio = modelPrice * groupRatio
+	}
+
+	// 最后的保护性检查
+	if math.IsNaN(ratio) || ratio <= 0 {
+		common.SysLog(fmt.Sprintf("[Cqtai Fetch] Invalid ratio calculation: modelPrice=%f, groupRatio=%f, userGroupRatio=%f, usingGroup=%s, userGroup=%s",
+			modelPrice, groupRatio, userGroupRatio, info.UsingGroup, info.UserGroup))
+		return
+	}
+
+	quota := int(ratio * common.QuotaPerUnit)
+	if quota <= 0 {
+		common.SysLog(fmt.Sprintf("[Cqtai Fetch] Invalid quota: %d, ratio=%f", quota, ratio))
+		return
+	}
+
+	err := service.PostConsumeQuota(info, quota, 0, true)
+	if err != nil {
+		common.SysLog("error consuming token remain quota: " + err.Error())
+		return
+	}
+
+	tokenName := c.GetString("token_name")
+	action := "FETCH"
+	if info.TaskRelayInfo != nil && info.TaskRelayInfo.Action != "" {
+		action = info.TaskRelayInfo.Action
+	}
+	logContent := fmt.Sprintf("操作 %s (查询)", action)
+
+	other := make(map[string]interface{})
+	if c != nil && c.Request != nil && c.Request.URL != nil {
+		// 精简路径，去掉 /api/cqt 前缀
+		requestPath := c.Request.URL.Path
+		if strings.HasPrefix(requestPath, "/api/cqt") {
+			requestPath = strings.TrimPrefix(requestPath, "/api/cqt")
+		}
+		other["request_path"] = requestPath
+	}
+	other["model_name"] = modelName
+
+	// 确保记录的值都是有效的
+	displayModelPrice := modelPrice
+	if math.IsNaN(displayModelPrice) {
+		displayModelPrice = 0.01
+	}
+	displayRatio := ratio
+	if math.IsNaN(displayRatio) {
+		displayRatio = 1.0
+	}
+	displayGroupRatio := groupRatio
+	if math.IsNaN(displayGroupRatio) {
+		displayGroupRatio = 1.0
+	}
+
+	other["model_price"] = displayModelPrice
+	other["ratio"] = displayRatio
+	other["group_ratio"] = displayGroupRatio
+	other["using_group"] = info.UsingGroup
+	other["user_group"] = info.UserGroup
+
+	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
+		ChannelId: info.ChannelId,
+		ModelName: modelName,
+		TokenName:  tokenName,
+		Quota:     quota,
+		Content:   logContent,
+		TokenId:   info.TokenId,
+		Group:     info.UsingGroup,
+		Other:     other,
+	})
+
+	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, quota)
+	model.UpdateChannelUsedQuota(info.ChannelId, quota)
 }
