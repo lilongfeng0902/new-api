@@ -95,9 +95,9 @@ func chatCompletionsViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ad
 
 	responsesReq, err := service.ChatCompletionsRequestToResponsesRequest(&overriddenChatReq)
 	if err != nil {
-		return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		return nil, types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
 	}
-	info.AppendRequestConversion(types.RelayFormatOpenAIResponses)
+	info.RelayFormat = types.RelayFormatOpenAIResponses
 
 	savedRelayMode := info.RelayMode
 	savedRequestURLPath := info.RequestURLPath

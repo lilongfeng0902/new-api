@@ -88,7 +88,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 	if err != nil {
 		return
 	}
-	CloseResponseBodyGracefully(resp)
+	_ = resp.Body.Close()
 	var errResponse dto.GeneralErrorResponse
 	buildErrWithBody := func(message string) error {
 		if message == "" {
@@ -159,7 +159,10 @@ func TaskErrorWrapper(err error, code string, statusCode int) *dto.TaskError {
 		//text = "请求上游地址失败"
 		text = common.MaskSensitiveInfo(text)
 	}
-	//避免暴露内部错误
+	// 避免暴露内部错误，如果传入的是空字符串，使用默认错误码
+	if code == "" {
+		code = types.ErrorCodeDoRequestFailed.String()
+	}
 	taskError := &dto.TaskError{
 		Code:       code,
 		Message:    text,

@@ -27,6 +27,14 @@ var errorMessages = map[ErrorCode]ErrorMessage{
 		"ru": "Обнаружены нежелательные слова в контенте",
 		"vi": "Phát hiện từ nhạy cảm trong nội dung",
 	},
+	ErrorCodeViolationFeeGrokCSAM: {
+		"en": "Content policy violation detected",
+		"zh": "检测到内容违规",
+		"ja": "コンテンツポリシー違反が検出されました",
+		"fr": "Violation de la politique de contenu détectée",
+		"ru": "Обнаружено нарушение политики содержимого",
+		"vi": "Phát hiện vi phạm chính sách nội dung",
+	},
 
 	// System Errors (2xxx)
 	ErrorCodeCountTokenFailed: {

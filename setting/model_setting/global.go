@@ -6,9 +6,49 @@ import (
 	"github.com/QuantumNous/new-api/setting/config"
 )
 
+// ChannelPolicy defines a policy for applying settings to specific channels
+type ChannelPolicy struct {
+	Enabled       bool     `json:"enabled"`
+	ChannelIDs    []int    `json:"channel_ids"`
+	ChannelTypes  []int    `json:"channel_types"`
+	ModelPatterns []string `json:"model_patterns"`
+}
+
+// IsChannelEnabled checks if the policy is enabled for the given channel
+func (p *ChannelPolicy) IsChannelEnabled(channelID int, channelType int) bool {
+	if !p.Enabled {
+		return false
+	}
+	// Check channel IDs
+	if len(p.ChannelIDs) > 0 {
+		for _, id := range p.ChannelIDs {
+			if id == channelID {
+				return true
+			}
+		}
+		return false
+	}
+	// Check channel types
+	if len(p.ChannelTypes) > 0 {
+		for _, ct := range p.ChannelTypes {
+			if ct == channelType {
+				return true
+			}
+		}
+		return false
+	}
+	return true
+}
+
+// ChatCompletionsToResponsesPolicy defines when to use Responses API for chat completions
+type ChatCompletionsToResponsesPolicy struct {
+	ChannelPolicy
+}
+
 type GlobalSettings struct {
-	PassThroughRequestEnabled bool     `json:"pass_through_request_enabled"`
-	ThinkingModelBlacklist    []string `json:"thinking_model_blacklist"`
+	PassThroughRequestEnabled        bool                                   `json:"pass_through_request_enabled"`
+	ThinkingModelBlacklist           []string                               `json:"thinking_model_blacklist"`
+	ChatCompletionsToResponsesPolicy ChatCompletionsToResponsesPolicy      `json:"chat_completions_to_responses_policy"`
 }
 
 // 默认配置
@@ -17,6 +57,14 @@ var defaultOpenaiSettings = GlobalSettings{
 	ThinkingModelBlacklist: []string{
 		"moonshotai/kimi-k2-thinking",
 		"kimi-k2-thinking",
+	},
+	ChatCompletionsToResponsesPolicy: ChatCompletionsToResponsesPolicy{
+		ChannelPolicy: ChannelPolicy{
+			Enabled:       false,
+			ChannelIDs:    []int{},
+			ChannelTypes:  []int{},
+			ModelPatterns: []string{},
+		},
 	},
 }
 

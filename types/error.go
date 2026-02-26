@@ -33,60 +33,6 @@ const (
 	ErrorTypeUpstreamError   ErrorType = "upstream_error"
 )
 
-// LegacyErrorCodeString is the OLD string-based error code type
-// DEPRECATED: Use ErrorCode (int) from error_code.go instead
-// Kept for backward compatibility during migration period
-type LegacyErrorCodeString string
-
-const (
-	LegacyErrorCodeInvalidRequest         LegacyErrorCodeString = "invalid_request"
-	LegacyErrorCodeSensitiveWordsDetected LegacyErrorCodeString = "sensitive_words_detected"
-
-	// new api error
-	LegacyErrorCodeCountTokenFailed   LegacyErrorCodeString = "count_token_failed"
-	LegacyErrorCodeModelPriceError    LegacyErrorCodeString = "model_price_error"
-	LegacyErrorCodeInvalidApiType     LegacyErrorCodeString = "invalid_api_type"
-	LegacyErrorCodeJsonMarshalFailed  LegacyErrorCodeString = "json_marshal_failed"
-	LegacyErrorCodeDoRequestFailed    LegacyErrorCodeString = "do_request_failed"
-	LegacyErrorCodeGetChannelFailed   LegacyErrorCodeString = "get_channel_failed"
-	LegacyErrorCodeGenRelayInfoFailed LegacyErrorCodeString = "gen_relay_info_failed"
-
-	// channel error
-	LegacyErrorCodeChannelNoAvailableKey        LegacyErrorCodeString = "channel:no_available_key"
-	LegacyErrorCodeChannelParamOverrideInvalid  LegacyErrorCodeString = "channel:param_override_invalid"
-	LegacyErrorCodeChannelHeaderOverrideInvalid LegacyErrorCodeString = "channel:header_override_invalid"
-	LegacyErrorCodeChannelModelMappedError      LegacyErrorCodeString = "channel:model_mapped_error"
-	LegacyErrorCodeChannelAwsClientError        LegacyErrorCodeString = "channel:aws_client_error"
-	LegacyErrorCodeChannelInvalidKey            LegacyErrorCodeString = "channel:invalid_key"
-	LegacyErrorCodeChannelResponseTimeExceeded  LegacyErrorCodeString = "channel:response_time_exceeded"
-
-	// client request error
-	LegacyErrorCodeReadRequestBodyFailed LegacyErrorCodeString = "read_request_body_failed"
-	LegacyErrorCodeConvertRequestFailed  LegacyErrorCodeString = "convert_request_failed"
-	LegacyErrorCodeAccessDenied          LegacyErrorCodeString = "access_denied"
-
-	// request error
-	LegacyErrorCodeBadRequestBody LegacyErrorCodeString = "bad_request_body"
-
-	// response error
-	LegacyErrorCodeReadResponseBodyFailed LegacyErrorCodeString = "read_response_body_failed"
-	LegacyErrorCodeBadResponseStatusCode  LegacyErrorCodeString = "bad_response_status_code"
-	LegacyErrorCodeBadResponse            LegacyErrorCodeString = "bad_response"
-	LegacyErrorCodeBadResponseBody        LegacyErrorCodeString = "bad_response_body"
-	LegacyErrorCodeEmptyResponse          LegacyErrorCodeString = "empty_response"
-	LegacyErrorCodeAwsInvokeError         LegacyErrorCodeString = "aws_invoke_error"
-	LegacyErrorCodeModelNotFound          LegacyErrorCodeString = "model_not_found"
-	LegacyErrorCodePromptBlocked          LegacyErrorCodeString = "prompt_blocked"
-
-	// sql error
-	LegacyErrorCodeQueryDataError  LegacyErrorCodeString = "query_data_error"
-	LegacyErrorCodeUpdateDataError LegacyErrorCodeString = "update_data_error"
-
-	// quota error
-	LegacyErrorCodeInsufficientUserQuota      LegacyErrorCodeString = "insufficient_user_quota"
-	LegacyErrorCodePreConsumeTokenQuotaFailed LegacyErrorCodeString = "pre_consume_token_quota_failed"
-)
-
 type NewAPIError struct {
 	Err            error
 	RelayError     any
@@ -383,6 +329,13 @@ func ErrOptionWithHideErrMsg(replaceStr string) NewAPIErrorOptions {
 func ErrOptionWithLevel(level ErrorLevel) NewAPIErrorOptions {
 	return func(e *NewAPIError) {
 		e.Level = level
+	}
+}
+
+// ErrOptionWithStatusCode sets a custom HTTP status code (overrides the default from error code)
+func ErrOptionWithStatusCode(statusCode int) NewAPIErrorOptions {
+	return func(e *NewAPIError) {
+		e.StatusCode = statusCode
 	}
 }
 

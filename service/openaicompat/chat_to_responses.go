@@ -335,15 +335,23 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 		Instructions:      instructionsRaw,
 		MaxOutputTokens:   maxOutputTokens,
 		Stream:            req.Stream,
-		Temperature:       req.Temperature,
 		Text:              textRaw,
 		ToolChoice:        toolChoiceRaw,
 		Tools:             toolsRaw,
-		TopP:              topP,
 		User:              req.User,
 		ParallelToolCalls: parallelToolCallsRaw,
 		Store:             req.Store,
 		Metadata:          req.Metadata,
+	}
+
+	// Handle Temperature - convert *float64 to float64 with default
+	if req.Temperature != nil {
+		out.Temperature = *req.Temperature
+	}
+
+	// Handle TopP - convert *float64 to float64 with default
+	if topP != nil {
+		out.TopP = *topP
 	}
 
 	if req.ReasoningEffort != "" && req.ReasoningEffort != "none" {

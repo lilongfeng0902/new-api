@@ -255,7 +255,10 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 			}
 
 		case "response.function_call_arguments.delta":
-			itemID := strings.TrimSpace(streamResp.ItemID)
+			itemID := ""
+			if streamResp.Item != nil {
+				itemID = strings.TrimSpace(streamResp.Item.ID)
+			}
 			callID := toolCallCanonicalIDByItemID[itemID]
 			if callID == "" {
 				callID = itemID

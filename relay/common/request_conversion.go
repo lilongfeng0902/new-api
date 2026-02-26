@@ -36,5 +36,5 @@ func AppendRequestConversionFromRequest(info *RelayInfo, req any) {
 	if !ok {
 		return
 	}
-	info.AppendRequestConversion(format)
+	info.RelayFormat = format
 }

@@ -54,10 +54,9 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 	// 确保信息已正确初始化
 	if info == nil {
 		logger.LogError(c, "[Cqtai Proxy] relay info is nil")
-		return types.NewErrorWithStatusCode(
+		return types.NewError(
 			fmt.Errorf("relay info is nil"),
-			"",
-			http.StatusInternalServerError,
+			types.ErrorCodeGenRelayInfoFailed,
 		)
 	}
 
@@ -66,39 +65,36 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 	// 检查 ChannelMeta 是否正确初始化
 	if info.ChannelMeta == nil {
 		logger.LogError(c, "[Cqtai Proxy] ChannelMeta is nil after InitChannelMeta")
-		return types.NewErrorWithStatusCode(
+		return types.NewError(
 			fmt.Errorf("channel metadata not initialized"),
-			"",
-			http.StatusInternalServerError,
+			types.ErrorCodeGetChannelFailed,
 		)
 	}
 
 	// 检查必要的字段
 	if info.ChannelBaseUrl == "" {
 		logger.LogError(c, "[Cqtai Proxy] ChannelBaseUrl is empty")
-		return types.NewErrorWithStatusCode(
+		return types.NewError(
 			fmt.Errorf("channel base URL is empty"),
-			"",
-			http.StatusInternalServerError,
+			types.ErrorCodeInvalidRequest,
 		)
 	}
 
 	if info.ApiKey == "" {
 		logger.LogError(c, "[Cqtai Proxy] ApiKey is empty")
-		return types.NewErrorWithStatusCode(
+		return types.NewError(
 			fmt.Errorf("API key is empty"),
-			"",
-			http.StatusInternalServerError,
+			types.ErrorCodeChannelInvalidKey,
 		)
 	}
 
 	// 验证请求（不需要初始化adaptor）
 	taskErr := validateRequestAndSetAction(c, info)
 	if taskErr != nil {
-		return types.NewErrorWithStatusCode(
+		return types.NewError(
 			taskErr.Error,
-			"",
-			taskErr.StatusCode,
+			types.ErrorCodeConvertRequestFailed,
+			types.ErrOptionWithStatusCode(taskErr.StatusCode),
 		)
 	}
 
@@ -106,17 +102,17 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 	adaptor := &cqtai.TaskAdaptor{}
 	adaptor.Init(info)
 	if taskErr != nil {
-		return types.NewErrorWithStatusCode(
+		return types.NewError(
 			taskErr.Error,
-			"",
-			taskErr.StatusCode,
+			types.ErrorCodeConvertRequestFailed,
+			types.ErrOptionWithStatusCode(taskErr.StatusCode),
 		)
 	}
 
 	// 构建请求URL
 	requestURL, err := adaptor.BuildRequestURL(info)
 	if err != nil {
-		return types.NewErrorWithStatusCode(err, "", http.StatusInternalServerError)
+		return types.NewError(err, types.ErrorCodeInvalidRequest)
 	}
 
 	// 构建请求体
@@ -124,7 +120,7 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 	if c.Request.Method == http.MethodPost {
 		requestBody, err = adaptor.BuildRequestBody(c, info)
 		if err != nil {
-			return types.NewErrorWithStatusCode(err, "", http.StatusBadRequest)
+			return types.NewError(err, types.ErrorCodeBadRequestBody)
 		}
 	}
 
@@ -135,7 +131,7 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 	resp, err := adaptor.DoRequest(c, info, requestBody)
 	if err != nil {
 		logger.LogError(c, fmt.Sprintf("do request failed: %v", err))
-		return types.NewErrorWithStatusCode(err, "", http.StatusInternalServerError)
+		return types.NewError(err, types.ErrorCodeDoRequestFailed)
 	}
 	defer resp.Body.Close()
 
@@ -143,7 +139,7 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logger.LogError(c, fmt.Sprintf("read response body failed: %v", err))
-		return types.NewErrorWithStatusCode(err, "", http.StatusInternalServerError)
+		return types.NewError(err, types.ErrorCodeReadResponseBodyFailed)
 	}
 
 	// 复制响应头
@@ -160,18 +156,20 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 		var cqtaiResp cqtai.CqtaiResponse
 		if jsonErr := json.Unmarshal(responseBody, &cqtaiResp); jsonErr == nil && !cqtaiResp.IsSuccess() {
 			logger.LogError(c, fmt.Sprintf("cqtai api error: %s", cqtaiResp.Msg))
-			return types.NewErrorWithStatusCode(
+			err := types.NewError(
 				fmt.Errorf("cqtai api error: %s", cqtaiResp.Msg),
-				"",
-				resp.StatusCode,
+				types.ErrorCodeBadResponseStatusCode,
+				types.ErrOptionWithStatusCode(resp.StatusCode),
 			)
+			return err
 		}
 		logger.LogError(c, fmt.Sprintf("upstream error: %s", string(responseBody)))
-		return types.NewErrorWithStatusCode(
+		err := types.NewError(
 			fmt.Errorf("upstream error: %s", string(responseBody)),
-			"",
-			resp.StatusCode,
+			types.ErrorCodeBadResponseStatusCode,
+			types.ErrOptionWithStatusCode(resp.StatusCode),
 		)
+		return err
 	}
 
 	// 直接返回响应
@@ -179,7 +177,7 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 	_, err = io.Copy(c.Writer, bytes.NewBuffer(responseBody))
 	if err != nil {
 		logger.LogError(c, fmt.Sprintf("failed to write response: %v", err))
-		return types.NewErrorWithStatusCode(err, "", http.StatusInternalServerError)
+		return types.NewError(err, types.ErrorCodeBadResponse)
 	}
 
 	// 记录消费（仅对查询接口，使用 suno_fetch 模型）

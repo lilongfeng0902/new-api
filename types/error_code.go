@@ -53,6 +53,7 @@ const (
 
 	ErrorCodeInvalidRequest ErrorCode = 1001
 	ErrorCodeSensitiveWordsDetected ErrorCode = 1002
+	ErrorCodeViolationFeeGrokCSAM ErrorCode = 1003
 
 	// System Errors (2xxx)
 
@@ -118,6 +119,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	// General Errors (1xxx)
 	ErrorCodeInvalidRequest:         "invalid_request",
 	ErrorCodeSensitiveWordsDetected: "sensitive_words_detected",
+	ErrorCodeViolationFeeGrokCSAM:   "violation_fee.grok_csam",
 
 	// System Errors (2xxx)
 	ErrorCodeCountTokenFailed:   "count_token_failed",
@@ -177,6 +179,7 @@ var errorCodeHTTPStatusMap = map[ErrorCode]int{
 	// General Errors (1xxx)
 	ErrorCodeInvalidRequest:         http.StatusBadRequest,
 	ErrorCodeSensitiveWordsDetected: http.StatusBadRequest,
+	ErrorCodeViolationFeeGrokCSAM:   http.StatusBadRequest,
 
 	// System Errors (2xxx)
 	ErrorCodeCountTokenFailed:   http.StatusInternalServerError,
@@ -236,6 +239,7 @@ var errorCodeLevelMap = map[ErrorCode]ErrorLevel{
 	// General Errors (1xxx)
 	ErrorCodeInvalidRequest:         ErrorLevelWarning,
 	ErrorCodeSensitiveWordsDetected: ErrorLevelWarning,
+	ErrorCodeViolationFeeGrokCSAM:   ErrorLevelWarning,
 
 	// System Errors (2xxx)
 	ErrorCodeCountTokenFailed:   ErrorLevelError,

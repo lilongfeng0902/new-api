@@ -334,13 +334,16 @@ type IncompleteDetails struct {
 }
 
 type ResponsesOutput struct {
-	Type    string                   `json:"type"`
-	ID      string                   `json:"id"`
-	Status  string                   `json:"status"`
-	Role    string                   `json:"role"`
-	Content []ResponsesOutputContent `json:"content"`
-	Quality string                   `json:"quality"`
-	Size    string                   `json:"size"`
+	Type      string                   `json:"type"`
+	ID        string                   `json:"id"`
+	Status    string                   `json:"status"`
+	Role      string                   `json:"role"`
+	Content   []ResponsesOutputContent `json:"content"`
+	Quality   string                   `json:"quality"`
+	Size      string                   `json:"size"`
+	Name      string                   `json:"name"`      // For function_call type
+	CallId    string                   `json:"call_id"`   // For function_call type
+	Arguments string                   `json:"arguments"` // For function_call type
 }
 
 type ResponsesOutputContent struct {

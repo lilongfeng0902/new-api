@@ -49,6 +49,7 @@ const (
 	RelayModeRerank
 
 	RelayModeResponses
+	RelayModeResponsesCompact
 
 	RelayModeRealtime
 

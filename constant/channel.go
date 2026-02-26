@@ -56,6 +56,7 @@ const (
 	ChannelTypeReplicate      = 56
 
 	ChannelTypeCqtai = 1000 // custom channel type for cqtai
+	ChannelTypeCodex = 1001 // custom channel type for codex
 	ChannelTypeDummy        // this one is only for count, do not add any channel after this
 
 )
