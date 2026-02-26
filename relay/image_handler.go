@@ -57,7 +57,6 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed)
 		}
-		relaycommon.AppendRequestConversionFromRequest(info, convertedRequest)
 
 		switch convertedRequest.(type) {
 		case *bytes.Buffer:

@@ -8,4 +8,4 @@ var ModelList = []string{
 	"suno_instrument_separation",
 }
 
-var ChannelName = "cqtai"
+var ChannelName = "Cqtai"

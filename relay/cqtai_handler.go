@@ -13,8 +13,8 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/channel/task/cqtai"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
@@ -61,10 +61,7 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 		)
 	}
 
-	logger.LogInfo(c, "[Cqtai Proxy] calling InitChannelMeta")
 	info.InitChannelMeta(c)
-
-	logger.LogInfo(c, fmt.Sprintf("[Cqtai Proxy] after InitChannelMeta - ChannelMeta nil: %v", info.ChannelMeta == nil))
 
 	// 检查 ChannelMeta 是否正确初始化
 	if info.ChannelMeta == nil {
@@ -75,9 +72,6 @@ func CqtaiProxyHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 			http.StatusInternalServerError,
 		)
 	}
-
-	logger.LogInfo(c, fmt.Sprintf("[Cqtai Proxy] ChannelBaseUrl: %q, ApiKey: %q, ChannelType: %d",
-		info.ChannelBaseUrl, info.ApiKey, info.ChannelType))
 
 	// 检查必要的字段
 	if info.ChannelBaseUrl == "" {
@@ -282,7 +276,7 @@ func recordCqtaiFetchConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
 		ChannelId: info.ChannelId,
 		ModelName: modelName,
-		TokenName:  tokenName,
+		TokenName: tokenName,
 		Quota:     quota,
 		Content:   logContent,
 		TokenId:   info.TokenId,

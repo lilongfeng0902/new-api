@@ -93,9 +93,6 @@ func SetRelayRouter(router *gin.Engine) {
 		httpRouter.POST("/responses", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatOpenAIResponses)
 		})
-		httpRouter.POST("/responses/compact", func(c *gin.Context) {
-			controller.Relay(c, types.RelayFormatOpenAIResponsesCompaction)
-		})
 
 		// image related routes
 		httpRouter.POST("/edits", func(c *gin.Context) {
@@ -172,14 +169,14 @@ func SetRelayRouter(router *gin.Engine) {
 		relaySunoRouter.GET("/fetch/:id", controller.RelayTask)
 	}
 
-	// Cqtai - 直接代理原始API路径
-	relayCqtaiRouter := router.Group("/api/cqt")
-	relayCqtaiRouter.Use(middleware.TokenAuth(), middleware.Distribute())
+	// Cqtai - 直接代理原始API路径（不带 /api/cqt 前缀，用于前端直接调用）
+	relayCqtaiSimpleRouter := router.Group("/api")
+	relayCqtaiSimpleRouter.Use(middleware.TokenAuth(), middleware.Distribute())
 	{
-		// POST https://api.cqtai.com/api/cqt/generator/suno - 需要任务系统
-		relayCqtaiRouter.POST("/generator/suno", controller.RelayTask)
-		// GET https://api.cqtai.com/api/cqt/v2/sunoinfo - 直接转发并记录消费
-		relayCqtaiRouter.GET("/v2/sunoinfo", controller.RelayProxy)
+		// POST /api/generator/suno - 需要任务系统
+		relayCqtaiSimpleRouter.POST("/generator/suno", controller.RelayTask)
+		// GET /api/v2/sunoinfo - 直接转发并记录消费
+		relayCqtaiSimpleRouter.GET("/v2/sunoinfo", controller.RelayProxy)
 	}
 
 	relayGeminiRouter := router.Group("/v1beta")

@@ -115,6 +115,12 @@ func GetStatus(c *gin.Context) {
 		"user_agreement_enabled":      legalSetting.UserAgreement != "",
 		"privacy_policy_enabled":      legalSetting.PrivacyPolicy != "",
 		"checkin_enabled":             operation_setting.GetCheckinSetting().Enabled,
+
+		// SMS Login Configuration
+		"sms_login_enabled": common.OptionMap["SmsLoginEnabled"] == "true",
+		"sms_bind_enabled":  common.OptionMap["SmsBindEnabled"] == "true",
+		"sms_reset_enabled": common.OptionMap["SmsResetEnabled"] == "true",
+		"register_enabled":  common.RegisterEnabled,
 	}
 
 	// 根据启用状态注入可选内容

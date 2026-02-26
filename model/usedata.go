@@ -126,3 +126,138 @@ func GetAllQuotaDates(startTime int64, endTime int64, username string) (quotaDat
 	err = DB.Table("quota_data").Select("model_name, sum(count) as count, sum(quota) as quota, sum(token_used) as token_used, created_at").Where("created_at >= ? and created_at <= ?", startTime, endTime).Group("model_name, created_at").Find(&quotaDatas).Error
 	return quotaDatas, err
 }
+
+// PublicStats 公开统计数据结构
+type PublicStats struct {
+	EnabledModelsCount   int64 `json:"enabled_models_count"`   // 启用的模型数量
+	EnabledChannelsCount int64 `json:"enabled_channels_count"` // 启用的渠道(服务商)数量
+	ActiveTokensCount    int64 `json:"active_tokens_count"`    // 有效令牌数量
+	TodayTokenUsage      int64 `json:"today_token_usage"`      // 今日Token消耗
+	TotalReqCount        int64 `json:"total_req_count"`        // 总请求数
+	TotalQuota           int64 `json:"total_quota"`            // 总消耗额度
+	TotalTokenUsage      int64 `json:"total_token_usage"`      // 总token消耗
+	TotalDataCount       int64 `json:"total_data_count"`       // 总数据记录数
+}
+
+// GetPublicStats 获取公开统计数据
+func GetPublicStats() (*PublicStats, error) {
+	stats := &PublicStats{}
+
+	// 查询1: 统计启用的模型数量 (从abilities表, enabled=true, 去重)
+	err := DB.Table("abilities").Where("enabled = ?", true).Distinct("model").Count(&stats.EnabledModelsCount).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 查询2: 统计启用的渠道(服务商)数量 (status=1, deleted_at IS NULL)
+	err = DB.Table("channels").Where("status = ?", 1).Count(&stats.EnabledChannelsCount).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 查询3: 统计有效令牌数量 (deleted_at IS NULL - GORM会自动处理软删除)
+	err = DB.Model(&Token{}).Count(&stats.ActiveTokensCount).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 查询4: 统计今日Token消耗 (从quota_data表,按自然日0:00-23:59)
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+	todayEnd := todayStart + 24*3600
+
+	var result struct {
+		TotalTokens int64
+	}
+	err = DB.Table("quota_data").
+		Select("COALESCE(SUM(token_used), 0) as total_tokens").
+		Where("created_at >= ? AND created_at < ?", todayStart, todayEnd).
+		Scan(&result).Error
+	if err != nil {
+		return nil, err
+	}
+	stats.TodayTokenUsage = result.TotalTokens
+
+	// 查询5: 统计总数据 (从quota_data表)
+	var totalResult struct {
+		TotalReqCount   int64
+		TotalQuota      int64
+		TotalTokenUsage int64
+		TotalDataCount  int64
+	}
+	err = DB.Table("quota_data").
+		Select("COALESCE(SUM(count), 0) as total_req_count, COALESCE(SUM(quota), 0) as total_quota, COALESCE(SUM(token_used), 0) as total_token_usage, COUNT(*) as total_data_count").
+		Scan(&totalResult).Error
+	if err != nil {
+		return nil, err
+	}
+	stats.TotalReqCount = totalResult.TotalReqCount
+	stats.TotalQuota = totalResult.TotalQuota
+	stats.TotalTokenUsage = totalResult.TotalTokenUsage
+	stats.TotalDataCount = totalResult.TotalDataCount
+
+	return stats, nil
+}
+
+// anonymizeUsername 用户名匿名化处理
+// 示例: "john_doe" -> "joh***oe", "alice" -> "a***e", "ab" -> "a***"
+func anonymizeUsername(username string) string {
+	if username == "" {
+		return "匿名用户"
+	}
+
+	length := len(username)
+	if length <= 2 {
+		return string(username[0]) + "***"
+	} else if length <= 4 {
+		return string(username[0]) + "***" + string(username[length-1])
+	} else {
+		return username[:3] + "***" + username[length-2:]
+	}
+}
+
+// GetTopUsersByConsumption 获取消费Top用户列表(用户名匿名化)
+func GetTopUsersByConsumption(startTime int64, endTime int64, limit int) ([]map[string]interface{}, error) {
+	// 参数验证
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50 // 防止滥用
+	}
+
+	var results []struct {
+		Username     string
+		TotalQuota   int64
+		TotalTokens  int64
+		RequestCount int64
+	}
+
+	// 按用户名聚合查询
+	err := DB.Table("quota_data").
+		Select("username, SUM(quota) as total_quota, SUM(token_used) as total_tokens, SUM(count) as request_count").
+		Where("created_at >= ? AND created_at <= ?", startTime, endTime).
+		Group("username").
+		Order("total_quota DESC").
+		Limit(limit).
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// 用户名匿名化处理
+	anonymizedResults := make([]map[string]interface{}, len(results))
+	for i, r := range results {
+		anonymized := anonymizeUsername(r.Username)
+
+		anonymizedResults[i] = map[string]interface{}{
+			"username":      anonymized,
+			"quota":         r.TotalQuota,
+			"token_used":    r.TotalTokens,
+			"request_count": r.RequestCount,
+		}
+	}
+
+	return anonymizedResults, nil
+}

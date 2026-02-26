@@ -68,6 +68,26 @@ const SystemSetting = () => {
     SMTPAccount: '',
     SMTPFrom: '',
     SMTPToken: '',
+    AliyunSMSEndpoint: '',
+    AliyunSMSAccessKeyId: '',
+    AliyunSMSAccessKeySecret: '',
+    AliyunSMSSignName: '',
+    AliyunSMSTemplateCode: '',
+    // SMS Login Configuration (14 fields)
+    SmsLoginEnabled: '',
+    SmsCodeLength: '',
+    SmsCodeMin: '',
+    SmsCodeMax: '',
+    SmsCodeExpireMinutes: '',
+    SmsSendFrequencySeconds: '',
+    SmsMaxSendPerDay: '',
+    SmsAutoRegisterEnabled: '',
+    SmsLoginTemplateCode: '',
+    SmsBindTemplateCode: '',
+    SmsResetTemplateCode: '',
+    SmsBindEnabled: '',
+    SmsResetEnabled: '',
+    SmsResetClearSessions: '',
     WorkerUrl: '',
     WorkerValidKey: '',
     WorkerAllowHttpImageRequestEnabled: '',
@@ -346,6 +366,148 @@ const SystemSetting = () => {
     }
   };
 
+  const submitSMS = async () => {
+    const options = [];
+
+    if (originInputs['AliyunSMSEndpoint'] !== inputs.AliyunSMSEndpoint) {
+      options.push({
+        key: 'AliyunSMSEndpoint',
+        value: inputs.AliyunSMSEndpoint,
+      });
+    }
+    if (originInputs['AliyunSMSAccessKeyId'] !== inputs.AliyunSMSAccessKeyId) {
+      options.push({
+        key: 'AliyunSMSAccessKeyId',
+        value: inputs.AliyunSMSAccessKeyId,
+      });
+    }
+    if (
+      originInputs['AliyunSMSAccessKeySecret'] !==
+      inputs.AliyunSMSAccessKeySecret
+    ) {
+      options.push({
+        key: 'AliyunSMSAccessKeySecret',
+        value: inputs.AliyunSMSAccessKeySecret,
+      });
+    }
+    if (originInputs['AliyunSMSSignName'] !== inputs.AliyunSMSSignName) {
+      options.push({
+        key: 'AliyunSMSSignName',
+        value: inputs.AliyunSMSSignName,
+      });
+    }
+    if (
+      originInputs['AliyunSMSTemplateCode'] !== inputs.AliyunSMSTemplateCode
+    ) {
+      options.push({
+        key: 'AliyunSMSTemplateCode',
+        value: inputs.AliyunSMSTemplateCode,
+      });
+    }
+
+    if (options.length > 0) {
+      await updateOptions(options);
+    }
+  };
+
+  const submitSmsLogin = async () => {
+    const options = [];
+
+    // Boolean fields
+    if (originInputs['SmsLoginEnabled'] !== inputs.SmsLoginEnabled) {
+      options.push({
+        key: 'SmsLoginEnabled',
+        value: inputs.SmsLoginEnabled,
+      });
+    }
+    if (originInputs['SmsAutoRegisterEnabled'] !== inputs.SmsAutoRegisterEnabled) {
+      options.push({
+        key: 'SmsAutoRegisterEnabled',
+        value: inputs.SmsAutoRegisterEnabled,
+      });
+    }
+    if (originInputs['SmsBindEnabled'] !== inputs.SmsBindEnabled) {
+      options.push({
+        key: 'SmsBindEnabled',
+        value: inputs.SmsBindEnabled,
+      });
+    }
+    if (originInputs['SmsResetEnabled'] !== inputs.SmsResetEnabled) {
+      options.push({
+        key: 'SmsResetEnabled',
+        value: inputs.SmsResetEnabled,
+      });
+    }
+    if (originInputs['SmsResetClearSessions'] !== inputs.SmsResetClearSessions) {
+      options.push({
+        key: 'SmsResetClearSessions',
+        value: inputs.SmsResetClearSessions,
+      });
+    }
+
+    // Number fields
+    if (originInputs['SmsCodeLength'] !== inputs.SmsCodeLength) {
+      options.push({
+        key: 'SmsCodeLength',
+        value: inputs.SmsCodeLength,
+      });
+    }
+    if (originInputs['SmsCodeMin'] !== inputs.SmsCodeMin) {
+      options.push({
+        key: 'SmsCodeMin',
+        value: inputs.SmsCodeMin,
+      });
+    }
+    if (originInputs['SmsCodeMax'] !== inputs.SmsCodeMax) {
+      options.push({
+        key: 'SmsCodeMax',
+        value: inputs.SmsCodeMax,
+      });
+    }
+    if (originInputs['SmsCodeExpireMinutes'] !== inputs.SmsCodeExpireMinutes) {
+      options.push({
+        key: 'SmsCodeExpireMinutes',
+        value: inputs.SmsCodeExpireMinutes,
+      });
+    }
+    if (originInputs['SmsSendFrequencySeconds'] !== inputs.SmsSendFrequencySeconds) {
+      options.push({
+        key: 'SmsSendFrequencySeconds',
+        value: inputs.SmsSendFrequencySeconds,
+      });
+    }
+    if (originInputs['SmsMaxSendPerDay'] !== inputs.SmsMaxSendPerDay) {
+      options.push({
+        key: 'SmsMaxSendPerDay',
+        value: inputs.SmsMaxSendPerDay,
+      });
+    }
+
+    // Template codes
+    if (originInputs['SmsLoginTemplateCode'] !== inputs.SmsLoginTemplateCode) {
+      options.push({
+        key: 'SmsLoginTemplateCode',
+        value: inputs.SmsLoginTemplateCode,
+      });
+    }
+    if (originInputs['SmsBindTemplateCode'] !== inputs.SmsBindTemplateCode) {
+      options.push({
+        key: 'SmsBindTemplateCode',
+        value: inputs.SmsBindTemplateCode,
+      });
+    }
+    if (originInputs['SmsResetTemplateCode'] !== inputs.SmsResetTemplateCode) {
+      options.push({
+        key: 'SmsResetTemplateCode',
+        value: inputs.SmsResetTemplateCode,
+      });
+    }
+
+    if (options.length > 0) {
+      await updateOptions(options);
+    }
+  };
+
   const submitEmailDomainWhitelist = async () => {
     if (Array.isArray(emailDomainWhitelist)) {
       await updateOptions([
@@ -481,10 +643,14 @@ const SystemSetting = () => {
     const options = [];
 
     if (originInputs['discord.client_id'] !== inputs['discord.client_id']) {
-      options.push({ key: 'discord.client_id', value: inputs['discord.client_id'] });
+      options.push({
+        key: 'discord.client_id',
+        value: inputs['discord.client_id'],
+      });
     }
     if (
-      originInputs['discord.client_secret'] !== inputs['discord.client_secret'] &&
+      originInputs['discord.client_secret'] !==
+        inputs['discord.client_secret'] &&
       inputs['discord.client_secret'] !== ''
     ) {
       options.push({
@@ -745,8 +911,8 @@ const SystemSetting = () => {
                       rel='noreferrer'
                     >
                       new-api-worker
-                    </a>
-                    {' '}{t('或其兼容new-api-worker格式的其他版本')}
+                    </a>{' '}
+                    {t('或其兼容new-api-worker格式的其他版本')}
                   </Text>
                   <Row
                     gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
@@ -1333,6 +1499,197 @@ const SystemSetting = () => {
                     </Col>
                   </Row>
                   <Button onClick={submitSMTP}>{t('保存 SMTP 设置')}</Button>
+                </Form.Section>
+              </Card>
+              <Card>
+                <Form.Section text={t('配置短信')}>
+                  <Text>{t('用以支持系统的短信发送')}</Text>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                  >
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='AliyunSMSEndpoint'
+                        label={t('阿里云短信端点')}
+                        placeholder='https://dysmsapi.aliyuncs.com'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='AliyunSMSAccessKeyId'
+                        label={t('AccessKey ID')}
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='AliyunSMSAccessKeySecret'
+                        label={t('AccessKey Secret')}
+                        type='password'
+                        placeholder='敏感信息不会发送到前端显示'
+                      />
+                    </Col>
+                  </Row>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                    style={{ marginTop: 16 }}
+                  >
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='AliyunSMSSignName'
+                        label={t('短信签名')}
+                        placeholder='您的短信签名'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='AliyunSMSTemplateCode'
+                        label={t('短信模板CODE')}
+                        placeholder='SMS_xxxxxxxxx'
+                      />
+                    </Col>
+                  </Row>
+                  <Button onClick={submitSMS} style={{ marginTop: 16 }}>
+                    {t('保存短信设置')}
+                  </Button>
+                </Form.Section>
+              </Card>
+              <Card>
+                <Form.Section text={t('短信验证码登录配置')}>
+                  <Text>{t('配置短信验证码登录、绑定、密码重置功能')}</Text>
+
+                  {/* 基础开关 */}
+                  <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }} style={{ marginTop: 16 }}>
+                    <Col xs={24} sm={12} md={8} lg={6} xl={6}>
+                      <Form.Checkbox
+                        field='SmsLoginEnabled'
+                        checked={inputs.SmsLoginEnabled === 'true'}
+                        onChange={(e) => handleCheckboxChange('SmsLoginEnabled', e)}
+                      >
+                        {t('启用短信登录')}
+                      </Form.Checkbox>
+                    </Col>
+                    <Col xs={24} sm={12} md={8} lg={6} xl={6}>
+                      <Form.Checkbox
+                        field='SmsAutoRegisterEnabled'
+                        checked={inputs.SmsAutoRegisterEnabled === 'true'}
+                        onChange={(e) => handleCheckboxChange('SmsAutoRegisterEnabled', e)}
+                      >
+                        {t('允许自动注册')}
+                      </Form.Checkbox>
+                    </Col>
+                    <Col xs={24} sm={12} md={8} lg={6} xl={6}>
+                      <Form.Checkbox
+                        field='SmsBindEnabled'
+                        checked={inputs.SmsBindEnabled === 'true'}
+                        onChange={(e) => handleCheckboxChange('SmsBindEnabled', e)}
+                      >
+                        {t('启用手机号绑定')}
+                      </Form.Checkbox>
+                    </Col>
+                    <Col xs={24} sm={12} md={8} lg={6} xl={6}>
+                      <Form.Checkbox
+                        field='SmsResetEnabled'
+                        checked={inputs.SmsResetEnabled === 'true'}
+                        onChange={(e) => handleCheckboxChange('SmsResetEnabled', e)}
+                      >
+                        {t('启用密码重置')}
+                      </Form.Checkbox>
+                    </Col>
+                    <Col xs={24} sm={12} md={8} lg={6} xl={6}>
+                      <Form.Checkbox
+                        field='SmsResetClearSessions'
+                        checked={inputs.SmsResetClearSessions === 'true'}
+                        onChange={(e) => handleCheckboxChange('SmsResetClearSessions', e)}
+                      >
+                        {t('重置密码后清除会话')}
+                      </Form.Checkbox>
+                    </Col>
+                  </Row>
+
+                  {/* 验证码配置 */}
+                  <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }} style={{ marginTop: 16 }}>
+                    <Col xs={24} sm={12} md={8} lg={6} xl={6}>
+                      <Form.Input
+                        field='SmsCodeLength'
+                        label={t('验证码长度')}
+                        placeholder='6'
+                        type='number'
+                      />
+                    </Col>
+                    <Col xs={24} sm={12} md={8} lg={6} xl={6}>
+                      <Form.Input
+                        field='SmsCodeMin'
+                        label={t('验证码最小值')}
+                        placeholder='100000'
+                        type='number'
+                      />
+                    </Col>
+                    <Col xs={24} sm={12} md={8} lg={6} xl={6}>
+                      <Form.Input
+                        field='SmsCodeMax'
+                        label={t('验证码最大值')}
+                        placeholder='999999'
+                        type='number'
+                      />
+                    </Col>
+                    <Col xs={24} sm={12} md={8} lg={6} xl={6}>
+                      <Form.Input
+                        field='SmsCodeExpireMinutes'
+                        label={t('验证码过期时间（分钟）')}
+                        placeholder='5'
+                        type='number'
+                      />
+                    </Col>
+                  </Row>
+
+                  {/* 频率控制 */}
+                  <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }} style={{ marginTop: 16 }}>
+                    <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='SmsSendFrequencySeconds'
+                        label={t('发送频率限制（秒）')}
+                        placeholder='60'
+                        type='number'
+                      />
+                    </Col>
+                    <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='SmsMaxSendPerDay'
+                        label={t('每日最大发送次数')}
+                        placeholder='10'
+                        type='number'
+                      />
+                    </Col>
+                  </Row>
+
+                  {/* 短信模板配置 */}
+                  <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }} style={{ marginTop: 16 }}>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='SmsLoginTemplateCode'
+                        label={t('登录验证码模板CODE')}
+                        placeholder='SMS_xxxxxxxxx'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='SmsBindTemplateCode'
+                        label={t('绑定验证码模板CODE')}
+                        placeholder='SMS_xxxxxxxxx'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='SmsResetTemplateCode'
+                        label={t('重置密码验证码模板CODE')}
+                        placeholder='SMS_xxxxxxxxx'
+                      />
+                    </Col>
+                  </Row>
+
+                  <Button onClick={submitSmsLogin} style={{ marginTop: 16 }}>
+                    {t('保存短信登录配置')}
+                  </Button>
                 </Form.Section>
               </Card>
               <Card>

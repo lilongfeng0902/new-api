@@ -424,6 +424,7 @@ const NotificationSettings = ({
                   <Radio value='webhook'>{t('Webhook通知')}</Radio>
                   <Radio value='bark'>{t('Bark通知')}</Radio>
                   <Radio value='gotify'>{t('Gotify通知')}</Radio>
+                  <Radio value='sms'>{t('短信通知')}</Radio>
                 </Form.RadioGroup>
 
                 <Form.AutoComplete
@@ -440,7 +441,7 @@ const NotificationSettings = ({
                   data={[
                     { value: 100000, label: '0.2$' },
                     { value: 500000, label: '1$' },
-                    { value: 1000000, label: '2$' },
+                    { value: 1000000, label: '5$' },
                     { value: 5000000, label: '10$' },
                   ]}
                   onChange={(val) => handleFormChange('warningThreshold', val)}
@@ -720,6 +721,31 @@ const NotificationSettings = ({
                       </div>
                     </div>
                   </>
+                )}
+
+                {/* 短信通知设置 */}
+                {notificationSettings.warningType === 'sms' && (
+                  <Form.Input
+                    field='smsPhoneNumber'
+                    label={t('接收手机号')}
+                    placeholder={t('请输入接收短信的手机号')}
+                    onChange={(val) => handleFormChange('smsPhoneNumber', val)}
+                    prefix={<IconBell />}
+                    extraText={t(
+                      '设置用于接收额度预警短信的手机号，必须是有效的手机号码',
+                    )}
+                    showClear
+                    rules={[
+                      {
+                        required: notificationSettings.warningType === 'sms',
+                        message: t('请输入接收手机号'),
+                      },
+                      {
+                        pattern: /^1[3-9]\d{9}$/,
+                        message: t('请输入有效的11位手机号码'),
+                      },
+                    ]}
+                  />
                 )}
               </div>
             </TabPane>

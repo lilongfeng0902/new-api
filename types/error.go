@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 )
@@ -35,56 +33,58 @@ const (
 	ErrorTypeUpstreamError   ErrorType = "upstream_error"
 )
 
-type ErrorCode string
+// LegacyErrorCodeString is the OLD string-based error code type
+// DEPRECATED: Use ErrorCode (int) from error_code.go instead
+// Kept for backward compatibility during migration period
+type LegacyErrorCodeString string
 
 const (
-	ErrorCodeInvalidRequest         ErrorCode = "invalid_request"
-	ErrorCodeSensitiveWordsDetected ErrorCode = "sensitive_words_detected"
-	ErrorCodeViolationFeeGrokCSAM   ErrorCode = "violation_fee.grok.csam"
+	LegacyErrorCodeInvalidRequest         LegacyErrorCodeString = "invalid_request"
+	LegacyErrorCodeSensitiveWordsDetected LegacyErrorCodeString = "sensitive_words_detected"
 
 	// new api error
-	ErrorCodeCountTokenFailed   ErrorCode = "count_token_failed"
-	ErrorCodeModelPriceError    ErrorCode = "model_price_error"
-	ErrorCodeInvalidApiType     ErrorCode = "invalid_api_type"
-	ErrorCodeJsonMarshalFailed  ErrorCode = "json_marshal_failed"
-	ErrorCodeDoRequestFailed    ErrorCode = "do_request_failed"
-	ErrorCodeGetChannelFailed   ErrorCode = "get_channel_failed"
-	ErrorCodeGenRelayInfoFailed ErrorCode = "gen_relay_info_failed"
+	LegacyErrorCodeCountTokenFailed   LegacyErrorCodeString = "count_token_failed"
+	LegacyErrorCodeModelPriceError    LegacyErrorCodeString = "model_price_error"
+	LegacyErrorCodeInvalidApiType     LegacyErrorCodeString = "invalid_api_type"
+	LegacyErrorCodeJsonMarshalFailed  LegacyErrorCodeString = "json_marshal_failed"
+	LegacyErrorCodeDoRequestFailed    LegacyErrorCodeString = "do_request_failed"
+	LegacyErrorCodeGetChannelFailed   LegacyErrorCodeString = "get_channel_failed"
+	LegacyErrorCodeGenRelayInfoFailed LegacyErrorCodeString = "gen_relay_info_failed"
 
 	// channel error
-	ErrorCodeChannelNoAvailableKey        ErrorCode = "channel:no_available_key"
-	ErrorCodeChannelParamOverrideInvalid  ErrorCode = "channel:param_override_invalid"
-	ErrorCodeChannelHeaderOverrideInvalid ErrorCode = "channel:header_override_invalid"
-	ErrorCodeChannelModelMappedError      ErrorCode = "channel:model_mapped_error"
-	ErrorCodeChannelAwsClientError        ErrorCode = "channel:aws_client_error"
-	ErrorCodeChannelInvalidKey            ErrorCode = "channel:invalid_key"
-	ErrorCodeChannelResponseTimeExceeded  ErrorCode = "channel:response_time_exceeded"
+	LegacyErrorCodeChannelNoAvailableKey        LegacyErrorCodeString = "channel:no_available_key"
+	LegacyErrorCodeChannelParamOverrideInvalid  LegacyErrorCodeString = "channel:param_override_invalid"
+	LegacyErrorCodeChannelHeaderOverrideInvalid LegacyErrorCodeString = "channel:header_override_invalid"
+	LegacyErrorCodeChannelModelMappedError      LegacyErrorCodeString = "channel:model_mapped_error"
+	LegacyErrorCodeChannelAwsClientError        LegacyErrorCodeString = "channel:aws_client_error"
+	LegacyErrorCodeChannelInvalidKey            LegacyErrorCodeString = "channel:invalid_key"
+	LegacyErrorCodeChannelResponseTimeExceeded  LegacyErrorCodeString = "channel:response_time_exceeded"
 
 	// client request error
-	ErrorCodeReadRequestBodyFailed ErrorCode = "read_request_body_failed"
-	ErrorCodeConvertRequestFailed  ErrorCode = "convert_request_failed"
-	ErrorCodeAccessDenied          ErrorCode = "access_denied"
+	LegacyErrorCodeReadRequestBodyFailed LegacyErrorCodeString = "read_request_body_failed"
+	LegacyErrorCodeConvertRequestFailed  LegacyErrorCodeString = "convert_request_failed"
+	LegacyErrorCodeAccessDenied          LegacyErrorCodeString = "access_denied"
 
 	// request error
-	ErrorCodeBadRequestBody ErrorCode = "bad_request_body"
+	LegacyErrorCodeBadRequestBody LegacyErrorCodeString = "bad_request_body"
 
 	// response error
-	ErrorCodeReadResponseBodyFailed ErrorCode = "read_response_body_failed"
-	ErrorCodeBadResponseStatusCode  ErrorCode = "bad_response_status_code"
-	ErrorCodeBadResponse            ErrorCode = "bad_response"
-	ErrorCodeBadResponseBody        ErrorCode = "bad_response_body"
-	ErrorCodeEmptyResponse          ErrorCode = "empty_response"
-	ErrorCodeAwsInvokeError         ErrorCode = "aws_invoke_error"
-	ErrorCodeModelNotFound          ErrorCode = "model_not_found"
-	ErrorCodePromptBlocked          ErrorCode = "prompt_blocked"
+	LegacyErrorCodeReadResponseBodyFailed LegacyErrorCodeString = "read_response_body_failed"
+	LegacyErrorCodeBadResponseStatusCode  LegacyErrorCodeString = "bad_response_status_code"
+	LegacyErrorCodeBadResponse            LegacyErrorCodeString = "bad_response"
+	LegacyErrorCodeBadResponseBody        LegacyErrorCodeString = "bad_response_body"
+	LegacyErrorCodeEmptyResponse          LegacyErrorCodeString = "empty_response"
+	LegacyErrorCodeAwsInvokeError         LegacyErrorCodeString = "aws_invoke_error"
+	LegacyErrorCodeModelNotFound          LegacyErrorCodeString = "model_not_found"
+	LegacyErrorCodePromptBlocked          LegacyErrorCodeString = "prompt_blocked"
 
 	// sql error
-	ErrorCodeQueryDataError  ErrorCode = "query_data_error"
-	ErrorCodeUpdateDataError ErrorCode = "update_data_error"
+	LegacyErrorCodeQueryDataError  LegacyErrorCodeString = "query_data_error"
+	LegacyErrorCodeUpdateDataError LegacyErrorCodeString = "update_data_error"
 
 	// quota error
-	ErrorCodeInsufficientUserQuota      ErrorCode = "insufficient_user_quota"
-	ErrorCodePreConsumeTokenQuotaFailed ErrorCode = "pre_consume_token_quota_failed"
+	LegacyErrorCodeInsufficientUserQuota      LegacyErrorCodeString = "insufficient_user_quota"
+	LegacyErrorCodePreConsumeTokenQuotaFailed LegacyErrorCodeString = "pre_consume_token_quota_failed"
 )
 
 type NewAPIError struct {
@@ -93,8 +93,9 @@ type NewAPIError struct {
 	skipRetry      bool
 	recordErrorLog *bool
 	errorType      ErrorType
-	errorCode      ErrorCode
+	errorCode      ErrorCode // NEW: numeric error code from error_code.go
 	StatusCode     int
+	Level          ErrorLevel // NEW: error severity level
 	Metadata       json.RawMessage
 }
 
@@ -108,7 +109,7 @@ func (e *NewAPIError) Unwrap() error {
 
 func (e *NewAPIError) GetErrorCode() ErrorCode {
 	if e == nil {
-		return ""
+		return 0 // Invalid error code
 	}
 	return e.errorCode
 }
@@ -126,23 +127,9 @@ func (e *NewAPIError) Error() string {
 	}
 	if e.Err == nil {
 		// fallback message when underlying error is missing
-		return string(e.errorCode)
+		return e.errorCode.String()
 	}
 	return e.Err.Error()
-}
-
-func (e *NewAPIError) ErrorWithStatusCode() string {
-	if e == nil {
-		return ""
-	}
-	msg := e.Error()
-	if e.StatusCode == 0 {
-		return msg
-	}
-	if msg == "" {
-		return fmt.Sprintf("status_code=%d", e.StatusCode)
-	}
-	return fmt.Sprintf("status_code=%d, %s", e.StatusCode, msg)
 }
 
 func (e *NewAPIError) MaskSensitiveError() string {
@@ -150,27 +137,13 @@ func (e *NewAPIError) MaskSensitiveError() string {
 		return ""
 	}
 	if e.Err == nil {
-		return string(e.errorCode)
+		return e.errorCode.String()
 	}
 	errStr := e.Err.Error()
 	if e.errorCode == ErrorCodeCountTokenFailed {
 		return errStr
 	}
 	return common.MaskSensitiveInfo(errStr)
-}
-
-func (e *NewAPIError) MaskSensitiveErrorWithStatusCode() string {
-	if e == nil {
-		return ""
-	}
-	msg := e.MaskSensitiveError()
-	if e.StatusCode == 0 {
-		return msg
-	}
-	if msg == "" {
-		return fmt.Sprintf("status_code=%d", e.StatusCode)
-	}
-	return fmt.Sprintf("status_code=%d, %s", e.StatusCode, msg)
 }
 
 func (e *NewAPIError) SetMessage(message string) {
@@ -254,8 +227,9 @@ func NewError(err error, errorCode ErrorCode, ops ...NewAPIErrorOptions) *NewAPI
 		Err:        err,
 		RelayError: nil,
 		errorType:  ErrorTypeNewAPIError,
-		StatusCode: http.StatusInternalServerError,
+		StatusCode: errorCode.HTTPStatusCode(), // Auto-map HTTP status code
 		errorCode:  errorCode,
+		Level:      errorCode.DefaultLevel(),   // Auto-set error level
 	}
 	for _, op := range ops {
 		op(e)
@@ -270,7 +244,7 @@ func NewOpenAIError(err error, errorCode ErrorCode, statusCode int, ops ...NewAP
 		if newErr.RelayError == nil {
 			openaiError := OpenAIError{
 				Message: newErr.Error(),
-				Type:    string(errorCode),
+				Type:    errorCode.String(),
 				Code:    errorCode,
 			}
 			newErr.RelayError = openaiError
@@ -282,7 +256,7 @@ func NewOpenAIError(err error, errorCode ErrorCode, statusCode int, ops ...NewAP
 	}
 	openaiError := OpenAIError{
 		Message: err.Error(),
-		Type:    string(errorCode),
+		Type:    errorCode.String(),
 		Code:    errorCode,
 	}
 	return WithOpenAIError(openaiError, statusCode, ops...)
@@ -290,7 +264,7 @@ func NewOpenAIError(err error, errorCode ErrorCode, statusCode int, ops ...NewAP
 
 func InitOpenAIError(errorCode ErrorCode, statusCode int, ops ...NewAPIErrorOptions) *NewAPIError {
 	openaiError := OpenAIError{
-		Type: string(errorCode),
+		Type: errorCode.String(),
 		Code: errorCode,
 	}
 	return WithOpenAIError(openaiError, statusCode, ops...)
@@ -301,11 +275,12 @@ func NewErrorWithStatusCode(err error, errorCode ErrorCode, statusCode int, ops 
 		Err: err,
 		RelayError: OpenAIError{
 			Message: err.Error(),
-			Type:    string(errorCode),
+			Type:    errorCode.String(),
 		},
 		errorType:  ErrorTypeNewAPIError,
 		StatusCode: statusCode,
 		errorCode:  errorCode,
+		Level:      errorCode.DefaultLevel(), // Set default level
 	}
 	for _, op := range ops {
 		op(e)
@@ -326,12 +301,14 @@ func WithOpenAIError(openAIError OpenAIError, statusCode int, ops ...NewAPIError
 	if openAIError.Type == "" {
 		openAIError.Type = "upstream_error"
 	}
+	errorCode := ErrorCodeFromString(code)
 	e := &NewAPIError{
 		RelayError: openAIError,
 		errorType:  ErrorTypeOpenAIError,
 		StatusCode: statusCode,
 		Err:        errors.New(openAIError.Message),
-		errorCode:  ErrorCode(code),
+		errorCode:  errorCode,
+		Level:      errorCode.DefaultLevel(), // Set default level
 	}
 	// OpenRouter
 	if len(openAIError.Metadata) > 0 {
@@ -350,12 +327,14 @@ func WithClaudeError(claudeError ClaudeError, statusCode int, ops ...NewAPIError
 	if claudeError.Type == "" {
 		claudeError.Type = "upstream_error"
 	}
+	errorCode := ErrorCodeFromString(claudeError.Type)
 	e := &NewAPIError{
 		RelayError: claudeError,
 		errorType:  ErrorTypeClaudeError,
 		StatusCode: statusCode,
 		Err:        errors.New(claudeError.Message),
-		errorCode:  ErrorCode(claudeError.Type),
+		errorCode:  errorCode,
+		Level:      errorCode.DefaultLevel(), // Set default level
 	}
 	for _, op := range ops {
 		op(e)
@@ -367,7 +346,8 @@ func IsChannelError(err *NewAPIError) bool {
 	if err == nil {
 		return false
 	}
-	return strings.HasPrefix(string(err.errorCode), "channel:")
+	// Channel errors are in the 3xxx range (3000-3999)
+	return err.errorCode >= 3000 && err.errorCode < 4000
 }
 
 func IsSkipRetryError(err *NewAPIError) bool {
@@ -396,6 +376,13 @@ func ErrOptionWithHideErrMsg(replaceStr string) NewAPIErrorOptions {
 			fmt.Printf("ErrOptionWithHideErrMsg: %s, origin error: %s", replaceStr, e.Err)
 		}
 		e.Err = errors.New(replaceStr)
+	}
+}
+
+// ErrOptionWithLevel sets a custom error level (overrides the default from error code)
+func ErrOptionWithLevel(level ErrorLevel) NewAPIErrorOptions {
+	return func(e *NewAPIError) {
+		e.Level = level
 	}
 }
 

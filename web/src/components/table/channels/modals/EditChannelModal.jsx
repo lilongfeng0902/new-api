@@ -46,7 +46,6 @@ import {
   Col,
   Highlight,
   Input,
-  Tooltip,
 } from '@douyinfe/semi-ui';
 import {
   getChannelModels,
@@ -56,9 +55,7 @@ import {
   selectFilter,
 } from '../../../../helpers';
 import ModelSelectModal from './ModelSelectModal';
-import SingleModelSelectModal from './SingleModelSelectModal';
 import OllamaModelModal from './OllamaModelModal';
-import CodexOAuthModal from './CodexOAuthModal';
 import JSONEditor from '../../../common/ui/JSONEditor';
 import SecureVerificationModal from '../../../common/modals/SecureVerificationModal';
 import ChannelKeyDisplay from '../../../common/ui/ChannelKeyDisplay';
@@ -72,7 +69,6 @@ import {
   IconCode,
   IconGlobe,
   IconBolt,
-  IconSearch,
   IconChevronUp,
   IconChevronDown,
 } from '@douyinfe/semi-icons';
@@ -96,7 +92,7 @@ const REGION_EXAMPLE = {
 
 // 支持并且已适配通过接口获取模型列表的渠道类型
 const MODEL_FETCHABLE_TYPES = new Set([
-  1, 4, 14, 34, 17, 26, 27, 24, 47, 25, 20, 23, 31, 40, 42, 48, 43,
+  1, 4, 14, 34, 17, 26, 27, 24, 47, 25, 20, 23, 31, 35, 40, 42, 48, 43,
 ]);
 
 function type2secretPrompt(type) {
@@ -118,8 +114,6 @@ function type2secretPrompt(type) {
       return '按照如下格式输入: AccessKey|SecretKey, 如果上游是New API，则直接输ApiKey';
     case 51:
       return '按照如下格式输入: AccessKey|SecretAccessKey';
-    case 57:
-      return '请输入 JSON 格式的 OAuth 凭据（必须包含 access_token 和 account_id）';
     default:
       return '请输入渠道对应的鉴权密钥';
   }
@@ -187,13 +181,6 @@ const EditChannelModal = (props) => {
   const [isModalOpenurl, setIsModalOpenurl] = useState(false);
   const [modelModalVisible, setModelModalVisible] = useState(false);
   const [fetchedModels, setFetchedModels] = useState([]);
-  const [modelMappingValueModalVisible, setModelMappingValueModalVisible] =
-    useState(false);
-  const [modelMappingValueModalModels, setModelMappingValueModalModels] =
-    useState([]);
-  const [modelMappingValueKey, setModelMappingValueKey] = useState('');
-  const [modelMappingValueSelected, setModelMappingValueSelected] =
-    useState('');
   const [ollamaModalVisible, setOllamaModalVisible] = useState(false);
   const formApiRef = useRef(null);
   const [vertexKeys, setVertexKeys] = useState([]);
@@ -225,9 +212,6 @@ const EditChannelModal = (props) => {
   }, [inputs.model_mapping]);
   const [isIonetChannel, setIsIonetChannel] = useState(false);
   const [ionetMetadata, setIonetMetadata] = useState(null);
-  const [codexOAuthModalVisible, setCodexOAuthModalVisible] = useState(false);
-  const [codexCredentialRefreshing, setCodexCredentialRefreshing] =
-    useState(false);
 
   // 密钥显示状态
   const [keyDisplayState, setKeyDisplayState] = useState({
@@ -508,6 +492,15 @@ const EditChannelModal = (props) => {
             base_url: 'https://ark.cn-beijing.volces.com',
           }));
           break;
+        case 1000:
+          localModels = [
+            'suno_music',
+            'suno_lyrics',
+            'suno_fetch',
+            'suno_voice_separation',
+            'suno_instrument_separation',
+          ];
+          break;
         default:
           localModels = getChannelModels(value);
           break;
@@ -519,32 +512,8 @@ const EditChannelModal = (props) => {
 
       // 重置手动输入模式状态
       setUseManualInput(false);
-
-      if (value === 57) {
-        setBatch(false);
-        setMultiToSingle(false);
-        setMultiKeyMode('random');
-        setVertexKeys([]);
-        setVertexFileList([]);
-        if (formApiRef.current) {
-          formApiRef.current.setValue('vertex_files', []);
-        }
-        setInputs((prev) => ({ ...prev, vertex_files: [] }));
-      }
     }
     //setAutoBan
-  };
-
-  const formatJsonField = (fieldName) => {
-    const rawValue = (inputs?.[fieldName] ?? '').trim();
-    if (!rawValue) return;
-
-    try {
-      const parsed = JSON.parse(rawValue);
-      handleInputChange(fieldName, JSON.stringify(parsed, null, 2));
-    } catch (error) {
-      showError(`${t('JSON格式错误')}: ${error.message}`);
-    }
   };
 
   const loadChannel = async () => {
@@ -768,49 +737,10 @@ const EditChannelModal = (props) => {
       if (!silent) {
         setModelModalVisible(true);
       }
-      setLoading(false);
-      return uniqueModels;
     } else {
       showError(t('获取模型列表失败'));
     }
     setLoading(false);
-    return null;
-  };
-
-  const openModelMappingValueModal = async ({ pairKey, value }) => {
-    const mappingKey = String(pairKey ?? '').trim();
-    if (!mappingKey) return;
-
-    if (!MODEL_FETCHABLE_TYPES.has(inputs.type)) {
-      return;
-    }
-
-    let modelsToUse = fetchedModels;
-    if (!Array.isArray(modelsToUse) || modelsToUse.length === 0) {
-      const fetched = await fetchUpstreamModelList('models', { silent: true });
-      if (Array.isArray(fetched)) {
-        modelsToUse = fetched;
-      }
-    }
-
-    if (!Array.isArray(modelsToUse) || modelsToUse.length === 0) {
-      showInfo(t('暂无模型'));
-      return;
-    }
-
-    const normalizedModelsToUse = Array.from(
-      new Set(
-        modelsToUse.map((model) => String(model ?? '').trim()).filter(Boolean),
-      ),
-    );
-    const currentValue = String(value ?? '').trim();
-
-    setModelMappingValueModalModels(normalizedModelsToUse);
-    setModelMappingValueKey(mappingKey);
-    setModelMappingValueSelected(
-      normalizedModelsToUse.includes(currentValue) ? currentValue : '',
-    );
-    setModelMappingValueModalVisible(true);
   };
 
   const fetchModels = async () => {
@@ -890,32 +820,6 @@ const EditChannelModal = (props) => {
     } catch (error) {
       console.error('Failed to view channel key:', error);
       showError(error.message || t('获取密钥失败'));
-    }
-  };
-
-  const handleCodexOAuthGenerated = (key) => {
-    handleInputChange('key', key);
-    formatJsonField('key');
-  };
-
-  const handleRefreshCodexCredential = async () => {
-    if (!isEdit) return;
-
-    setCodexCredentialRefreshing(true);
-    try {
-      const res = await API.post(
-        `/api/channel/${channelId}/codex/refresh`,
-        {},
-        { skipErrorHandler: true },
-      );
-      if (!res?.data?.success) {
-        throw new Error(res?.data?.message || 'Failed to refresh credential');
-      }
-      showSuccess(t('凭证已刷新'));
-    } catch (error) {
-      showError(error.message || t('刷新失败'));
-    } finally {
-      setCodexCredentialRefreshing(false);
     }
   };
 
@@ -1166,47 +1070,6 @@ const EditChannelModal = (props) => {
   const submit = async () => {
     const formValues = formApiRef.current ? formApiRef.current.getValues() : {};
     let localInputs = { ...formValues };
-
-    if (localInputs.type === 57) {
-      if (batch) {
-        showInfo(t('Codex 渠道不支持批量创建'));
-        return;
-      }
-
-      const rawKey = (localInputs.key || '').trim();
-      if (!isEdit && rawKey === '') {
-        showInfo(t('请输入密钥！'));
-        return;
-      }
-
-      if (rawKey !== '') {
-        if (!verifyJSON(rawKey)) {
-          showInfo(t('密钥必须是合法的 JSON 格式！'));
-          return;
-        }
-        try {
-          const parsed = JSON.parse(rawKey);
-          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            showInfo(t('密钥必须是 JSON 对象'));
-            return;
-          }
-          const accessToken = String(parsed.access_token || '').trim();
-          const accountId = String(parsed.account_id || '').trim();
-          if (!accessToken) {
-            showInfo(t('密钥 JSON 必须包含 access_token'));
-            return;
-          }
-          if (!accountId) {
-            showInfo(t('密钥 JSON 必须包含 account_id'));
-            return;
-          }
-          localInputs.key = JSON.stringify(parsed);
-        } catch (error) {
-          showInfo(t('密钥必须是合法的 JSON 格式！'));
-          return;
-        }
-      }
-    }
 
     if (localInputs.type === 41) {
       const keyType = localInputs.vertex_key_type || 'json';
@@ -1539,7 +1402,7 @@ const EditChannelModal = (props) => {
     }
   };
 
-  const batchAllowed = (!isEdit || isMultiKeyChannel) && inputs.type !== 57;
+  const batchAllowed = !isEdit || isMultiKeyChannel;
   const batchExtra = batchAllowed ? (
     <Space>
       {!isEdit && (
@@ -2000,171 +1863,87 @@ const EditChannelModal = (props) => {
                           autoComplete='new-password'
                           onChange={(value) => handleInputChange('key', value)}
                           disabled={isIonetLocked}
-                        extraText={
-                          <div className='flex items-center gap-2 flex-wrap'>
-                            {isEdit &&
-                              isMultiKeyChannel &&
-                              keyMode === 'append' && (
-                                <Text type='warning' size='small'>
-                                  {t(
-                                    '追加模式：新密钥将添加到现有密钥列表的末尾',
-                                  )}
-                                </Text>
+                          extraText={
+                            <div className='flex items-center gap-2 flex-wrap'>
+                              {isEdit &&
+                                isMultiKeyChannel &&
+                                keyMode === 'append' && (
+                                  <Text type='warning' size='small'>
+                                    {t(
+                                      '追加模式：新密钥将添加到现有密钥列表的末尾',
+                                    )}
+                                  </Text>
+                                )}
+                              {isEdit && (
+                                <Button
+                                  size='small'
+                                  type='primary'
+                                  theme='outline'
+                                  onClick={handleShow2FAModal}
+                                >
+                                  {t('查看密钥')}
+                                </Button>
                               )}
-                            {isEdit && (
-                              <Button
-                                size='small'
-                                type='primary'
-                                theme='outline'
-                                onClick={handleShow2FAModal}
-                              >
-                                {t('查看密钥')}
-                              </Button>
-                            )}
-                            {batchExtra}
-                          </div>
-                        }
-                        showClear
-                      />
-                    )
-                  ) : (
-                    <>
-                      {inputs.type === 57 ? (
-                        <>
-                          <Form.TextArea
-                            field='key'
-                            label={
-                              isEdit
-                                ? t('密钥（编辑模式下，保存的密钥不会显示）')
-                                : t('密钥')
-                            }
-                            placeholder={t(
-                              '请输入 JSON 格式的 OAuth 凭据，例如：\n{\n  "access_token": "...",\n  "account_id": "..." \n}',
-                            )}
-                            rules={
-                              isEdit
-                                ? []
-                                : [{ required: true, message: t('请输入密钥') }]
-                            }
-                            autoComplete='new-password'
-                            onChange={(value) => handleInputChange('key', value)}
-                            disabled={isIonetLocked}
-                            extraText={
-                              <div className='flex flex-col gap-2'>
-                                <Text type='tertiary' size='small'>
-                                  {t(
-                                    '仅支持 JSON 对象，必须包含 access_token 与 account_id',
-                                  )}
+                              {batchExtra}
+                            </div>
+                          }
+                          showClear
+                        />
+                      )
+                    ) : (
+                      <>
+                        {inputs.type === 41 &&
+                        (inputs.vertex_key_type || 'json') === 'json' ? (
+                          <>
+                            {!batch && (
+                              <div className='flex items-center justify-between mb-3'>
+                                <Text className='text-sm font-medium'>
+                                  {t('密钥输入方式')}
                                 </Text>
-
-                                <Space wrap spacing='tight'>
+                                <Space>
                                   <Button
                                     size='small'
-                                    type='primary'
-                                    theme='outline'
-                                    onClick={() =>
-                                      setCodexOAuthModalVisible(true)
+                                    type={
+                                      !useManualInput ? 'primary' : 'tertiary'
                                     }
-                                    disabled={isIonetLocked}
+                                    onClick={() => {
+                                      setUseManualInput(false);
+                                      // 切换到文件上传模式时清空手动输入的密钥
+                                      if (formApiRef.current) {
+                                        formApiRef.current.setValue('key', '');
+                                      }
+                                      handleInputChange('key', '');
+                                    }}
                                   >
-                                    {t('Codex 授权')}
+                                    {t('文件上传')}
                                   </Button>
-                                  {isEdit && (
-                                    <Button
-                                      size='small'
-                                      type='primary'
-                                      theme='outline'
-                                      onClick={handleRefreshCodexCredential}
-                                      loading={codexCredentialRefreshing}
-                                      disabled={isIonetLocked}
-                                    >
-                                      {t('刷新凭证')}
-                                    </Button>
-                                  )}
                                   <Button
                                     size='small'
-                                    type='primary'
-                                    theme='outline'
-                                    onClick={() => formatJsonField('key')}
-                                    disabled={isIonetLocked}
+                                    type={
+                                      useManualInput ? 'primary' : 'tertiary'
+                                    }
+                                    onClick={() => {
+                                      setUseManualInput(true);
+                                      // 切换到手动输入模式时清空文件上传相关状态
+                                      setVertexKeys([]);
+                                      setVertexFileList([]);
+                                      if (formApiRef.current) {
+                                        formApiRef.current.setValue(
+                                          'vertex_files',
+                                          [],
+                                        );
+                                      }
+                                      setInputs((prev) => ({
+                                        ...prev,
+                                        vertex_files: [],
+                                      }));
+                                    }}
                                   >
-                                    {t('格式化')}
+                                    {t('手动输入')}
                                   </Button>
-                                  {isEdit && (
-                                    <Button
-                                      size='small'
-                                      type='primary'
-                                      theme='outline'
-                                      onClick={handleShow2FAModal}
-                                      disabled={isIonetLocked}
-                                    >
-                                      {t('查看密钥')}
-                                    </Button>
-                                  )}
-                                  {batchExtra}
                                 </Space>
                               </div>
-                            }
-                            autosize
-                            showClear
-                          />
-
-                          <CodexOAuthModal
-                            visible={codexOAuthModalVisible}
-                            onCancel={() => setCodexOAuthModalVisible(false)}
-                            onSuccess={handleCodexOAuthGenerated}
-                          />
-                        </>
-                      ) : inputs.type === 41 &&
-                        (inputs.vertex_key_type || 'json') === 'json' ? (
-                        <>
-                          {!batch && (
-                            <div className='flex items-center justify-between mb-3'>
-                              <Text className='text-sm font-medium'>
-                                {t('密钥输入方式')}
-                              </Text>
-                              <Space>
-                                <Button
-                                  size='small'
-                                  type={
-                                    !useManualInput ? 'primary' : 'tertiary'
-                                  }
-                                  onClick={() => {
-                                    setUseManualInput(false);
-                                    // 切换到文件上传模式时清空手动输入的密钥
-                                    if (formApiRef.current) {
-                                      formApiRef.current.setValue('key', '');
-                                    }
-                                    handleInputChange('key', '');
-                                  }}
-                                >
-                                  {t('文件上传')}
-                                </Button>
-                                <Button
-                                  size='small'
-                                  type={useManualInput ? 'primary' : 'tertiary'}
-                                  onClick={() => {
-                                    setUseManualInput(true);
-                                    // 切换到手动输入模式时清空文件上传相关状态
-                                    setVertexKeys([]);
-                                    setVertexFileList([]);
-                                    if (formApiRef.current) {
-                                      formApiRef.current.setValue(
-                                        'vertex_files',
-                                        [],
-                                      );
-                                    }
-                                    setInputs((prev) => ({
-                                      ...prev,
-                                      vertex_files: [],
-                                    }));
-                                  }}
-                                >
-                                  {t('手动输入')}
-                                </Button>
-                              </Space>
-                            </div>
-                          )}
+                            )}
 
                             {batch && (
                               <Banner
@@ -2894,27 +2673,6 @@ const EditChannelModal = (props) => {
                       templateLabel={t('填入模板')}
                       editorType='keyValue'
                       formApi={formApiRef.current}
-                      renderStringValueSuffix={({ pairKey, value }) => {
-                        if (!MODEL_FETCHABLE_TYPES.has(inputs.type)) {
-                          return null;
-                        }
-                        const disabled = !String(pairKey ?? '').trim();
-                        return (
-                          <Tooltip content={t('选择模型')}>
-                            <Button
-                              type='tertiary'
-                              theme='borderless'
-                              size='small'
-                              icon={<IconSearch size={14} />}
-                              disabled={disabled}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openModelMappingValueModal({ pairKey, value });
-                              }}
-                            />
-                          </Tooltip>
-                        );
-                      }}
                       extraText={t(
                         '键为请求中的模型名称，值为要替换的模型名称',
                       )}
@@ -3077,12 +2835,6 @@ const EditChannelModal = (props) => {
                           >
                             {t('新格式模板')}
                           </Text>
-                          <Text
-                            className='!text-semi-color-primary cursor-pointer'
-                            onClick={() => formatJsonField('param_override')}
-                          >
-                            {t('格式化')}
-                          </Text>
                         </div>
                       }
                       showClear
@@ -3122,12 +2874,6 @@ const EditChannelModal = (props) => {
                               }
                             >
                               {t('填入模板')}
-                            </Text>
-                            <Text
-                              className='!text-semi-color-primary cursor-pointer'
-                              onClick={() => formatJsonField('header_override')}
-                            >
-                              {t('格式化')}
                             </Text>
                           </div>
                           <div>
@@ -3439,53 +3185,6 @@ const EditChannelModal = (props) => {
           setModelModalVisible(false);
         }}
         onCancel={() => setModelModalVisible(false)}
-      />
-
-      <SingleModelSelectModal
-        visible={modelMappingValueModalVisible}
-        models={modelMappingValueModalModels}
-        selected={modelMappingValueSelected}
-        onConfirm={(selectedModel) => {
-          const modelName = String(selectedModel ?? '').trim();
-          if (!modelName) {
-            showError(t('请先选择模型！'));
-            return;
-          }
-
-          const mappingKey = String(modelMappingValueKey ?? '').trim();
-          if (!mappingKey) {
-            setModelMappingValueModalVisible(false);
-            return;
-          }
-
-          let parsed = {};
-          const currentMapping = inputs.model_mapping;
-          if (typeof currentMapping === 'string' && currentMapping.trim()) {
-            try {
-              parsed = JSON.parse(currentMapping);
-            } catch (error) {
-              parsed = {};
-            }
-          } else if (
-            currentMapping &&
-            typeof currentMapping === 'object' &&
-            !Array.isArray(currentMapping)
-          ) {
-            parsed = currentMapping;
-          }
-          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            parsed = {};
-          }
-
-          parsed[mappingKey] = modelName;
-          const nextMapping = JSON.stringify(parsed, null, 2);
-          handleInputChange('model_mapping', nextMapping);
-          if (formApiRef.current) {
-            formApiRef.current.setValue('model_mapping', nextMapping);
-          }
-          setModelMappingValueModalVisible(false);
-        }}
-        onCancel={() => setModelMappingValueModalVisible(false)}
       />
 
       <OllamaModelModal

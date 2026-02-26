@@ -10,7 +10,6 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/relay/channel/openrouter"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/relay/reasonmap"
 )
 
 func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.RelayInfo) (*dto.GeneralOpenAIRequest, error) {
@@ -541,7 +540,20 @@ func ResponseOpenAI2Claude(openAIResponse *dto.OpenAITextResponse, info *relayco
 }
 
 func stopReasonOpenAI2Claude(reason string) string {
-	return reasonmap.OpenAIFinishReasonToClaudeStopReason(reason)
+	switch reason {
+	case "stop":
+		return "end_turn"
+	case "stop_sequence":
+		return "stop_sequence"
+	case "length":
+		fallthrough
+	case "max_tokens":
+		return "max_tokens"
+	case "tool_calls":
+		return "tool_use"
+	default:
+		return reason
+	}
 }
 
 func toJSONString(v interface{}) string {

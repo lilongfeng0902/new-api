@@ -26,7 +26,6 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
-	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -85,11 +84,6 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 		}
 	} else {
 		// 如果没有指定端点类型，使用原有的自动检测逻辑
-
-		if strings.Contains(strings.ToLower(testModel), "rerank") {
-			requestPath = "/v1/rerank"
-		}
-
 		// 先判断是否为 Embedding 模型
 		if strings.Contains(strings.ToLower(testModel), "embedding") ||
 			strings.HasPrefix(testModel, "m3e") || // m3e 系列模型
@@ -108,14 +102,6 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 		if strings.Contains(strings.ToLower(testModel), "codex") {
 			requestPath = "/v1/responses"
 		}
-
-		// responses compaction models (must use /v1/responses/compact)
-		if strings.HasSuffix(testModel, ratio_setting.CompactModelSuffix) {
-			requestPath = "/v1/responses/compact"
-		}
-	}
-	if strings.HasPrefix(requestPath, "/v1/responses/compact") {
-		testModel = ratio_setting.WithCompactModelSuffix(testModel)
 	}
 
 	c.Request = &http.Request{
@@ -159,8 +145,6 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 			relayFormat = types.RelayFormatOpenAI
 		case constant.EndpointTypeOpenAIResponse:
 			relayFormat = types.RelayFormatOpenAIResponses
-		case constant.EndpointTypeOpenAIResponseCompact:
-			relayFormat = types.RelayFormatOpenAIResponsesCompaction
 		case constant.EndpointTypeAnthropic:
 			relayFormat = types.RelayFormatClaude
 		case constant.EndpointTypeGemini:
@@ -195,9 +179,6 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 		if c.Request.URL.Path == "/v1/responses" {
 			relayFormat = types.RelayFormatOpenAIResponses
 		}
-		if strings.HasPrefix(c.Request.URL.Path, "/v1/responses/compact") {
-			relayFormat = types.RelayFormatOpenAIResponsesCompaction
-		}
 	}
 
 	request := buildTestRequest(testModel, endpointType, channel)
@@ -212,7 +193,6 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 		}
 	}
 
-	info.IsChannelTest = true
 	info.InitChannelMeta(c)
 
 	err = helper.ModelMappedHelper(c, info, request)
@@ -229,15 +209,6 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 	request.SetModelName(testModel)
 
 	apiType, _ := common.ChannelType2APIType(channel.Type)
-	if info.RelayMode == relayconstant.RelayModeResponsesCompact &&
-		apiType != constant.APITypeOpenAI &&
-		apiType != constant.APITypeCodex {
-		return testResult{
-			context:     c,
-			localErr:    fmt.Errorf("responses compaction test only supports openai/codex channels, got api type %d", apiType),
-			newAPIError: types.NewError(fmt.Errorf("unsupported api type: %d", apiType), types.ErrorCodeInvalidApiType),
-		}
-	}
 	adaptor := relay.GetAdaptor(apiType)
 	if adaptor == nil {
 		return testResult{
@@ -310,25 +281,6 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 				newAPIError: types.NewError(errors.New("invalid response request type"), types.ErrorCodeConvertRequestFailed),
 			}
 		}
-	case relayconstant.RelayModeResponsesCompact:
-		// Response compaction request - convert to OpenAIResponsesRequest before adapting
-		switch req := request.(type) {
-		case *dto.OpenAIResponsesCompactionRequest:
-			convertedRequest, err = adaptor.ConvertOpenAIResponsesRequest(c, info, dto.OpenAIResponsesRequest{
-				Model:              req.Model,
-				Input:              req.Input,
-				Instructions:       req.Instructions,
-				PreviousResponseID: req.PreviousResponseID,
-			})
-		case *dto.OpenAIResponsesRequest:
-			convertedRequest, err = adaptor.ConvertOpenAIResponsesRequest(c, info, *req)
-		default:
-			return testResult{
-				context:     c,
-				localErr:    errors.New("invalid response compaction request type"),
-				newAPIError: types.NewError(errors.New("invalid response compaction request type"), types.ErrorCodeConvertRequestFailed),
-			}
-		}
 	default:
 		// Chat/Completion 等其他请求类型
 		if generalReq, ok := request.(*dto.GeneralOpenAIRequest); ok {
@@ -357,29 +309,8 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 			newAPIError: types.NewError(err, types.ErrorCodeJsonMarshalFailed),
 		}
 	}
-
-	//jsonData, err = relaycommon.RemoveDisabledFields(jsonData, info.ChannelOtherSettings)
-	//if err != nil {
-	//	return testResult{
-	//		context:     c,
-	//		localErr:    err,
-	//		newAPIError: types.NewError(err, types.ErrorCodeConvertRequestFailed),
-	//	}
-	//}
-
-	if len(info.ParamOverride) > 0 {
-		jsonData, err = relaycommon.ApplyParamOverride(jsonData, info.ParamOverride, relaycommon.BuildParamOverrideContext(info))
-		if err != nil {
-			return testResult{
-				context:     c,
-				localErr:    err,
-				newAPIError: types.NewError(err, types.ErrorCodeChannelParamOverrideInvalid),
-			}
-		}
-	}
-
 	requestBody := bytes.NewBuffer(jsonData)
-	c.Request.Body = io.NopCloser(bytes.NewBuffer(jsonData))
+	c.Request.Body = io.NopCloser(requestBody)
 	resp, err := adaptor.DoRequest(c, info, requestBody)
 	if err != nil {
 		return testResult{
@@ -474,8 +405,6 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 }
 
 func buildTestRequest(model string, endpointType string, channel *model.Channel) dto.Request {
-	testResponsesInput := json.RawMessage(`[{"role":"user","content":"hi"}]`)
-
 	// 根据端点类型构建不同的测试请求
 	if endpointType != "" {
 		switch constant.EndpointType(endpointType) {
@@ -505,13 +434,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel)
 			// 返回 OpenAIResponsesRequest
 			return &dto.OpenAIResponsesRequest{
 				Model: model,
-				Input: json.RawMessage(`[{"role":"user","content":"hi"}]`),
-			}
-		case constant.EndpointTypeOpenAIResponseCompact:
-			// 返回 OpenAIResponsesCompactionRequest
-			return &dto.OpenAIResponsesCompactionRequest{
-				Model: model,
-				Input: testResponsesInput,
+				Input: json.RawMessage("\"hi\""),
 			}
 		case constant.EndpointTypeAnthropic, constant.EndpointTypeGemini, constant.EndpointTypeOpenAI:
 			// 返回 GeneralOpenAIRequest
@@ -534,15 +457,6 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel)
 	}
 
 	// 自动检测逻辑（保持原有行为）
-	if strings.Contains(strings.ToLower(model), "rerank") {
-		return &dto.RerankRequest{
-			Model:     model,
-			Query:     "What is Deep Learning?",
-			Documents: []any{"Deep Learning is a subset of machine learning.", "Machine learning is a field of artificial intelligence."},
-			TopN:      2,
-		}
-	}
-
 	// 先判断是否为 Embedding 模型
 	if strings.Contains(strings.ToLower(model), "embedding") ||
 		strings.HasPrefix(model, "m3e") ||
@@ -554,19 +468,11 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel)
 		}
 	}
 
-	// Responses compaction models (must use /v1/responses/compact)
-	if strings.HasSuffix(model, ratio_setting.CompactModelSuffix) {
-		return &dto.OpenAIResponsesCompactionRequest{
-			Model: model,
-			Input: testResponsesInput,
-		}
-	}
-
 	// Responses-only models (e.g. codex series)
 	if strings.Contains(strings.ToLower(model), "codex") {
 		return &dto.OpenAIResponsesRequest{
 			Model: model,
-			Input: json.RawMessage(`[{"role":"user","content":"hi"}]`),
+			Input: json.RawMessage("\"hi\""),
 		}
 	}
 

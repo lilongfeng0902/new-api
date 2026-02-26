@@ -32,6 +32,7 @@ import { Nav, Divider, Button } from '@douyinfe/semi-ui';
 
 const routerMap = {
   home: '/',
+  dashboard: '/dashboard',
   channel: '/console/channel',
   token: '/console/token',
   redemption: '/console/redemption',

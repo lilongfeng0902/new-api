@@ -99,9 +99,6 @@ func newHTTPClient() *http.Client {
 		ExpectContinueTimeout: 1 * time.Second,
 		ResponseHeaderTimeout: time.Duration(timeoutSec) * time.Second,
 	}
-	if common.TLSInsecureSkipVerify {
-		transport.TLSClientConfig = common.InsecureTLSConfig
-	}
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		host, _, err := net.SplitHostPort(addr)
 		if err != nil {
@@ -118,17 +115,7 @@ func newHTTPClient() *http.Client {
 	return &http.Client{Transport: transport}
 }
 
-var (
-	httpClientOnce sync.Once
-	httpClient     *http.Client
-)
-
-func getHTTPClient() *http.Client {
-	httpClientOnce.Do(func() {
-		httpClient = newHTTPClient()
-	})
-	return httpClient
-}
+var httpClient = newHTTPClient()
 
 func fetchJSON[T any](ctx context.Context, url string, out *upstreamEnvelope[T]) error {
 	var lastErr error
@@ -151,7 +138,7 @@ func fetchJSON[T any](ctx context.Context, url string, out *upstreamEnvelope[T])
 		}
 		cacheMutex.RUnlock()
 
-		resp, err := getHTTPClient().Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			lastErr = err
 			// backoff with jitter

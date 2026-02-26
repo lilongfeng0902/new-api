@@ -21,7 +21,6 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -45,7 +44,7 @@ func relayHandler(c *gin.Context, info *relaycommon.RelayInfo) *types.NewAPIErro
 		err = relay.RerankHelper(c, info)
 	case relayconstant.RelayModeEmbeddings:
 		err = relay.EmbeddingHelper(c, info)
-	case relayconstant.RelayModeResponses, relayconstant.RelayModeResponsesCompact:
+	case relayconstant.RelayModeResponses:
 		err = relay.ResponsesHelper(c, info)
 	default:
 		err = relay.TextHelper(c, info)
@@ -167,12 +166,8 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	defer func() {
 		// Only return quota if downstream failed and quota was actually pre-consumed
-		if newAPIError != nil {
-			newAPIError = service.NormalizeViolationFeeError(newAPIError)
-			if relayInfo.FinalPreConsumedQuota != 0 {
-				service.ReturnPreConsumedQuota(c, relayInfo)
-			}
-			service.ChargeViolationFeeIfNeeded(c, relayInfo, newAPIError)
+		if newAPIError != nil && relayInfo.FinalPreConsumedQuota != 0 {
+			service.ReturnPreConsumedQuota(c, relayInfo)
 		}
 	}()
 
@@ -218,8 +213,6 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if newAPIError == nil {
 			return
 		}
-
-		newAPIError = service.NormalizeViolationFeeError(newAPIError)
 
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
 
@@ -323,14 +316,30 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 	if _, ok := c.Get("specific_channel_id"); ok {
 		return false
 	}
-	code := openaiErr.StatusCode
-	if code >= 200 && code < 300 {
-		return false
-	}
-	if code < 100 || code > 599 {
+	if openaiErr.StatusCode == http.StatusTooManyRequests {
 		return true
 	}
-	return operation_setting.ShouldRetryByStatusCode(code)
+	if openaiErr.StatusCode == 307 {
+		return true
+	}
+	if openaiErr.StatusCode/100 == 5 {
+		// 超时不重试
+		if openaiErr.StatusCode == 504 || openaiErr.StatusCode == 524 {
+			return false
+		}
+		return true
+	}
+	if openaiErr.StatusCode == http.StatusBadRequest {
+		return false
+	}
+	if openaiErr.StatusCode == 408 {
+		// azure处理超时不重试
+		return false
+	}
+	if openaiErr.StatusCode/100 == 2 {
+		return false
+	}
+	return true
 }
 
 func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError) {
@@ -339,7 +348,7 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	// do not use context to get channel info, there may be inconsistent channel info when processing asynchronously
 	if service.ShouldDisableChannel(channelError.ChannelType, err) && channelError.AutoBan {
 		gopool.Go(func() {
-			service.DisableChannel(channelError, err.ErrorWithStatusCode())
+			service.DisableChannel(channelError, err.Error())
 		})
 	}
 
@@ -368,9 +377,8 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 			adminInfo["is_multi_key"] = true
 			adminInfo["multi_key_index"] = common.GetContextKeyInt(c, constant.ContextKeyChannelMultiKeyIndex)
 		}
-		service.AppendChannelAffinityAdminInfo(c, adminInfo)
 		other["admin_info"] = adminInfo
-		model.RecordErrorLog(c, userId, channelId, modelName, tokenName, err.MaskSensitiveErrorWithStatusCode(), tokenId, 0, false, userGroup, other)
+		model.RecordErrorLog(c, userId, channelId, modelName, tokenName, err.MaskSensitiveError(), tokenId, 0, false, userGroup, other)
 	}
 
 }

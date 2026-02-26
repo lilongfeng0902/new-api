@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -120,6 +121,7 @@ func setupLogin(user *model.User, c *gin.Context) {
 			"role":         user.Role,
 			"status":       user.Status,
 			"group":        user.Group,
+			"mobile":       user.Mobile,
 		},
 	})
 }
@@ -451,6 +453,7 @@ func GetSelf(c *gin.Context) {
 		"role":              user.Role,
 		"status":            user.Status,
 		"email":             user.Email,
+		"mobile":            user.Mobile,
 		"github_id":         user.GitHubId,
 		"discord_id":        user.DiscordId,
 		"oidc_id":           user.OidcId,
@@ -1110,6 +1113,7 @@ type UpdateUserSettingRequest struct {
 	GotifyUrl                  string  `json:"gotify_url,omitempty"`
 	GotifyToken                string  `json:"gotify_token,omitempty"`
 	GotifyPriority             int     `json:"gotify_priority,omitempty"`
+	SMSPhoneNumber             string  `json:"sms_phone_number,omitempty"`
 	AcceptUnsetModelRatioModel bool    `json:"accept_unset_model_ratio_model"`
 	RecordIpLog                bool    `json:"record_ip_log"`
 }
@@ -1125,7 +1129,7 @@ func UpdateUserSetting(c *gin.Context) {
 	}
 
 	// 验证预警类型
-	if req.QuotaWarningType != dto.NotifyTypeEmail && req.QuotaWarningType != dto.NotifyTypeWebhook && req.QuotaWarningType != dto.NotifyTypeBark && req.QuotaWarningType != dto.NotifyTypeGotify {
+	if req.QuotaWarningType != dto.NotifyTypeEmail && req.QuotaWarningType != dto.NotifyTypeWebhook && req.QuotaWarningType != dto.NotifyTypeBark && req.QuotaWarningType != dto.NotifyTypeGotify && req.QuotaWarningType != dto.NotifyTypeSMS {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "无效的预警类型",
@@ -1234,6 +1238,25 @@ func UpdateUserSetting(c *gin.Context) {
 		}
 	}
 
+	// 如果是SMS类型，验证手机号
+	if req.QuotaWarningType == dto.NotifyTypeSMS {
+		if req.SMSPhoneNumber == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "短信接收手机号不能为空",
+			})
+			return
+		}
+		// 验证手机号格式（中国大陆手机号格式）
+		if matched, _ := regexp.MatchString(`^1[3-9]\d{9}$`, req.SMSPhoneNumber); !matched {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "请输入有效的11位手机号码",
+			})
+			return
+		}
+	}
+
 	userId := c.GetInt("id")
 	user, err := model.GetUserById(userId, true)
 	if err != nil {
@@ -1277,6 +1300,11 @@ func UpdateUserSetting(c *gin.Context) {
 		} else {
 			settings.GotifyPriority = req.GotifyPriority
 		}
+	}
+
+	// 如果是SMS类型，添加SMS手机号到设置中
+	if req.QuotaWarningType == dto.NotifyTypeSMS {
+		settings.SMSPhoneNumber = req.SMSPhoneNumber
 	}
 
 	// 更新用户设置

@@ -1,7 +1,6 @@
 package common
 
 import (
-	"crypto/tls"
 	//"os"
 	//"strconv"
 	"sync"
@@ -74,15 +73,18 @@ var MemoryCacheEnabled bool
 
 var LogConsumeEnabled = true
 
-var TLSInsecureSkipVerify bool
-var InsecureTLSConfig = &tls.Config{InsecureSkipVerify: true}
-
 var SMTPServer = ""
 var SMTPPort = 587
 var SMTPSSLEnabled = false
 var SMTPAccount = ""
 var SMTPFrom = ""
 var SMTPToken = ""
+
+var AliyunSMSEndpoint = "https://dysmsapi.aliyuncs.com"
+var AliyunSMSAccessKeyId = ""
+var AliyunSMSAccessKeySecret = ""
+var AliyunSMSSignName = ""
+var AliyunSMSTemplateCode = ""
 
 var GitHubClientId = ""
 var GitHubClientSecret = ""

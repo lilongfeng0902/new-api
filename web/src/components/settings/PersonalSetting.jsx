@@ -42,6 +42,7 @@ import NotificationSettings from './personal/cards/NotificationSettings';
 import CheckinCalendar from './personal/cards/CheckinCalendar';
 import EmailBindModal from './personal/modals/EmailBindModal';
 import WeChatBindModal from './personal/modals/WeChatBindModal';
+import PhoneBindModal from './personal/modals/PhoneBindModal';
 import AccountDeleteModal from './personal/modals/AccountDeleteModal';
 import ChangePasswordModal from './personal/modals/ChangePasswordModal';
 
@@ -54,6 +55,8 @@ const PersonalSetting = () => {
     wechat_verification_code: '',
     email_verification_code: '',
     email: '',
+    mobile: '',
+    mobile_verification_code: '',
     self_account_deletion_confirmation: '',
     original_password: '',
     set_new_password: '',
@@ -63,6 +66,7 @@ const PersonalSetting = () => {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showWeChatBindModal, setShowWeChatBindModal] = useState(false);
   const [showEmailBindModal, setShowEmailBindModal] = useState(false);
+  const [showPhoneBindModal, setShowPhoneBindModal] = useState(false);
   const [showAccountDeleteModal, setShowAccountDeleteModal] = useState(false);
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
@@ -70,6 +74,9 @@ const PersonalSetting = () => {
   const [loading, setLoading] = useState(false);
   const [disableButton, setDisableButton] = useState(false);
   const [countdown, setCountdown] = useState(30);
+  const [phoneBindLoading, setPhoneBindLoading] = useState(false);
+  const [phoneDisableButton, setPhoneDisableButton] = useState(false);
+  const [phoneCountdown, setPhoneCountdown] = useState(60);
   const [systemToken, setSystemToken] = useState('');
   const [passkeyStatus, setPasskeyStatus] = useState({ enabled: false });
   const [passkeyRegisterLoading, setPasskeyRegisterLoading] = useState(false);
@@ -85,6 +92,7 @@ const PersonalSetting = () => {
     gotifyUrl: '',
     gotifyToken: '',
     gotifyPriority: 5,
+    smsPhoneNumber: '',
     acceptUnsetModelRatioModel: false,
     recordIpLog: false,
   });
@@ -144,6 +152,17 @@ const PersonalSetting = () => {
   }, [disableButton, countdown]);
 
   useEffect(() => {
+    let interval = null;
+    if (phoneDisableButton && phoneCountdown > 0) {
+      interval = setInterval(() => setPhoneCountdown(phoneCountdown - 1), 1000);
+    } else if (phoneCountdown === 0) {
+      setPhoneDisableButton(false);
+      setPhoneCountdown(60);
+    }
+    return () => clearInterval(interval);
+  }, [phoneDisableButton, phoneCountdown]);
+
+  useEffect(() => {
     if (userState?.user?.setting) {
       const settings = JSON.parse(userState.user.setting);
       setNotificationSettings({
@@ -157,6 +176,7 @@ const PersonalSetting = () => {
         gotifyToken: settings.gotify_token || '',
         gotifyPriority:
           settings.gotify_priority !== undefined ? settings.gotify_priority : 5,
+        smsPhoneNumber: settings.sms_phone_number || '',
         acceptUnsetModelRatioModel:
           settings.accept_unset_model_ratio_model || false,
         recordIpLog: settings.record_ip_log || false,
@@ -388,6 +408,77 @@ const PersonalSetting = () => {
     setLoading(false);
   };
 
+  const sendPhoneVerificationCode = async () => {
+    if (!inputs.mobile || inputs.mobile.length !== 11) {
+      showError(t('请输入有效的11位手机号'));
+      return;
+    }
+
+    setPhoneBindLoading(true);
+    try {
+      const res = await API.post('/api/user/send-bind-code', {
+        mobile: inputs.mobile,
+      });
+      const { success, message, data } = res.data;
+      if (success) {
+        showSuccess(t('验证码已发送'));
+        setPhoneDisableButton(true);
+        setPhoneCountdown(data?.expire_minutes ? data.expire_minutes * 60 : 60);
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setPhoneBindLoading(false);
+    }
+  };
+
+  const bindPhone = async () => {
+    if (!inputs.mobile || !inputs.mobile_verification_code) {
+      showError(t('请输入手机号和验证码'));
+      return;
+    }
+
+    try {
+      const res = await API.post('/api/user/bind-mobile', {
+        mobile: inputs.mobile,
+        code: inputs.mobile_verification_code,
+      });
+      const { success, message } = res.data;
+      if (success) {
+        showSuccess(t('手机号绑定成功'));
+        setShowPhoneBindModal(false);
+        // 更新用户信息
+        await getUserData();
+        setInputs({
+          ...inputs,
+          mobile: '',
+          mobile_verification_code: '',
+        });
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message);
+    }
+  };
+
+  const unbindPhone = async () => {
+    try {
+      const res = await API.post('/api/user/unbind-mobile');
+      const { success, message } = res.data;
+      if (success) {
+        showSuccess(t('手机号解绑成功'));
+        await getUserData();
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message);
+    }
+  };
+
   const copyText = async (text) => {
     if (await copy(text)) {
       showSuccess(t('已复制：') + text);
@@ -425,6 +516,7 @@ const PersonalSetting = () => {
           const parsed = parseInt(notificationSettings.gotifyPriority);
           return isNaN(parsed) ? 5 : parsed;
         })(),
+        sms_phone_number: notificationSettings.smsPhoneNumber,
         accept_unset_model_ratio_model:
           notificationSettings.acceptUnsetModelRatioModel,
         record_ip_log: notificationSettings.recordIpLog,
@@ -470,6 +562,8 @@ const PersonalSetting = () => {
               systemToken={systemToken}
               setShowEmailBindModal={setShowEmailBindModal}
               setShowWeChatBindModal={setShowWeChatBindModal}
+              setShowPhoneBindModal={setShowPhoneBindModal}
+              onUnbindPhone={unbindPhone}
               generateAccessToken={generateAccessToken}
               handleSystemTokenClick={handleSystemTokenClick}
               setShowChangePasswordModal={setShowChangePasswordModal}
@@ -518,6 +612,22 @@ const PersonalSetting = () => {
         handleInputChange={handleInputChange}
         bindWeChat={bindWeChat}
         status={status}
+      />
+
+      <PhoneBindModal
+        t={t}
+        showPhoneBindModal={showPhoneBindModal}
+        setShowPhoneBindModal={setShowPhoneBindModal}
+        inputs={inputs}
+        handleInputChange={handleInputChange}
+        sendVerificationCode={sendPhoneVerificationCode}
+        bindPhone={bindPhone}
+        disableButton={phoneDisableButton}
+        loading={phoneBindLoading}
+        countdown={phoneCountdown}
+        turnstileEnabled={turnstileEnabled}
+        turnstileSiteKey={turnstileSiteKey}
+        setTurnstileToken={setTurnstileToken}
       />
 
       <AccountDeleteModal

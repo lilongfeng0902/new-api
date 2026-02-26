@@ -53,8 +53,6 @@ const (
 	RelayModeRealtime
 
 	RelayModeGemini
-
-	RelayModeResponsesCompact
 )
 
 func Path2RelayMode(path string) int {
@@ -75,8 +73,6 @@ func Path2RelayMode(path string) int {
 		relayMode = RelayModeImagesEdits
 	} else if strings.HasPrefix(path, "/v1/edits") {
 		relayMode = RelayModeEdits
-	} else if strings.HasPrefix(path, "/v1/responses/compact") {
-		relayMode = RelayModeResponsesCompact
 	} else if strings.HasPrefix(path, "/v1/responses") {
 		relayMode = RelayModeResponses
 	} else if strings.HasPrefix(path, "/v1/audio/speech") {
@@ -154,11 +150,11 @@ func Path2RelaySuno(method, path string) int {
 
 func Path2RelayCqtai(method, path string) int {
 	relayMode := RelayModeUnknown
-	// GET /api/cqt/v2/sunoinfo - 查询任务
-	if method == http.MethodGet && strings.Contains(path, "/api/cqt/v2/sunoinfo") {
+	// GET /api/v2/sunoinfo - 查询任务
+	if method == http.MethodGet && strings.Contains(path, "/api/v2/sunoinfo") {
 		relayMode = RelayModeCqtaiFetch
-	} else if method == http.MethodPost && strings.Contains(path, "/api/cqt/generator/suno") {
-		// POST /api/cqt/generator/suno - 提交任务
+	} else if method == http.MethodPost && strings.Contains(path, "/api/generator/suno") {
+		// POST /api/generator/suno - 提交任务
 		relayMode = RelayModeCqtaiSubmit
 	}
 	return relayMode

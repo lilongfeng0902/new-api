@@ -185,9 +185,9 @@ export const CHANNEL_OPTIONS = [
     label: 'Replicate',
   },
   {
-    value: 57,
+    value: 1000,
     color: 'blue',
-    label: 'Codex (OpenAI OAuth)',
+    label: 'Cqtai',
   },
 ];
 

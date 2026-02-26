@@ -61,6 +61,28 @@ func InitOptionMap() {
 	common.OptionMap["SMTPAccount"] = ""
 	common.OptionMap["SMTPToken"] = ""
 	common.OptionMap["SMTPSSLEnabled"] = strconv.FormatBool(common.SMTPSSLEnabled)
+	common.OptionMap["AliyunSMSEndpoint"] = common.AliyunSMSEndpoint
+	common.OptionMap["AliyunSMSAccessKeyId"] = ""
+	common.OptionMap["AliyunSMSAccessKeySecret"] = ""
+	common.OptionMap["AliyunSMSSignName"] = ""
+	common.OptionMap["AliyunSMSTemplateCode"] = ""
+
+	// SMS Login Configuration
+	common.OptionMap["SmsLoginEnabled"] = "true"
+	common.OptionMap["SmsCodeLength"] = "6"
+	common.OptionMap["SmsCodeMin"] = "100000"
+	common.OptionMap["SmsCodeMax"] = "999999"
+	common.OptionMap["SmsCodeExpireMinutes"] = "5"
+	common.OptionMap["SmsSendFrequencySeconds"] = "60"
+	common.OptionMap["SmsMaxSendPerDay"] = "10"
+	common.OptionMap["SmsAutoRegisterEnabled"] = "true"
+	common.OptionMap["SmsLoginTemplateCode"] = ""
+	common.OptionMap["SmsBindTemplateCode"] = ""
+	common.OptionMap["SmsResetTemplateCode"] = ""
+	common.OptionMap["SmsBindEnabled"] = "true"
+	common.OptionMap["SmsResetEnabled"] = "true"
+	common.OptionMap["SmsResetClearSessions"] = "false"
+
 	common.OptionMap["Notice"] = ""
 	common.OptionMap["About"] = ""
 	common.OptionMap["HomePageContent"] = ""
@@ -143,8 +165,6 @@ func InitOptionMap() {
 	common.OptionMap["SensitiveWords"] = setting.SensitiveWordsToString()
 	common.OptionMap["StreamCacheQueueLength"] = strconv.Itoa(setting.StreamCacheQueueLength)
 	common.OptionMap["AutomaticDisableKeywords"] = operation_setting.AutomaticDisableKeywordsToString()
-	common.OptionMap["AutomaticDisableStatusCodes"] = operation_setting.AutomaticDisableStatusCodesToString()
-	common.OptionMap["AutomaticRetryStatusCodes"] = operation_setting.AutomaticRetryStatusCodesToString()
 	common.OptionMap["ExposeRatioEnabled"] = strconv.FormatBool(ratio_setting.IsExposeRatioEnabled())
 
 	// 自动添加所有注册的模型配置
@@ -296,6 +316,14 @@ func updateOptionMap(key string, value string) (err error) {
 			setting.DefaultUseAutoGroup = boolValue
 		case "ExposeRatioEnabled":
 			ratio_setting.SetExposeRatioEnabled(boolValue)
+		case "SmsLoginEnabled":
+			// 短信登录开关，直接通过OptionMap读取，无需额外处理
+		case "SmsAutoRegisterEnabled":
+			// 短信自动注册开关，直接通过OptionMap读取，无需额外处理
+		case "SmsBindEnabled":
+			// 短信绑定开关，直接通过OptionMap读取，无需额外处理
+		case "SmsResetEnabled":
+			// 短信重置开关，直接通过OptionMap读取，无需额外处理
 		}
 	}
 	switch key {
@@ -312,6 +340,16 @@ func updateOptionMap(key string, value string) (err error) {
 		common.SMTPFrom = value
 	case "SMTPToken":
 		common.SMTPToken = value
+	case "AliyunSMSEndpoint":
+		common.AliyunSMSEndpoint = value
+	case "AliyunSMSAccessKeyId":
+		common.AliyunSMSAccessKeyId = value
+	case "AliyunSMSAccessKeySecret":
+		common.AliyunSMSAccessKeySecret = value
+	case "AliyunSMSSignName":
+		common.AliyunSMSSignName = value
+	case "AliyunSMSTemplateCode":
+		common.AliyunSMSTemplateCode = value
 	case "ServerAddress":
 		system_setting.ServerAddress = value
 	case "WorkerUrl":
@@ -446,10 +484,6 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.SensitiveWordsFromString(value)
 	case "AutomaticDisableKeywords":
 		operation_setting.AutomaticDisableKeywordsFromString(value)
-	case "AutomaticDisableStatusCodes":
-		err = operation_setting.AutomaticDisableStatusCodesFromString(value)
-	case "AutomaticRetryStatusCodes":
-		err = operation_setting.AutomaticRetryStatusCodesFromString(value)
 	case "StreamCacheQueueLength":
 		setting.StreamCacheQueueLength, _ = strconv.Atoi(value)
 	case "PayMethods":

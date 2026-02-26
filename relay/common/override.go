@@ -570,19 +570,18 @@ func mergeObjects(jsonStr, path string, value interface{}, keepOrigin bool) (str
 
 // BuildParamOverrideContext 提供 ApplyParamOverride 可用的上下文信息。
 // 目前内置以下字段：
-//   - upstream_model/model：始终为通道映射后的上游模型名。
+//   - model：优先使用上游模型名（UpstreamModelName），若不存在则回落到原始模型名（OriginModelName）。
+//   - upstream_model：始终为通道映射后的上游模型名。
 //   - original_model：请求最初指定的模型名。
-//   - request_path：请求路径
-//   - is_channel_test：是否为渠道测试请求（同 is_test）。
 func BuildParamOverrideContext(info *RelayInfo) map[string]interface{} {
-	if info == nil {
+	if info == nil || info.ChannelMeta == nil {
 		return nil
 	}
 
 	ctx := make(map[string]interface{})
-	if info.ChannelMeta != nil && info.ChannelMeta.UpstreamModelName != "" {
-		ctx["model"] = info.ChannelMeta.UpstreamModelName
-		ctx["upstream_model"] = info.ChannelMeta.UpstreamModelName
+	if info.UpstreamModelName != "" {
+		ctx["model"] = info.UpstreamModelName
+		ctx["upstream_model"] = info.UpstreamModelName
 	}
 	if info.OriginModelName != "" {
 		ctx["original_model"] = info.OriginModelName
@@ -591,13 +590,8 @@ func BuildParamOverrideContext(info *RelayInfo) map[string]interface{} {
 		}
 	}
 
-	if info.RequestURLPath != "" {
-		requestPath := info.RequestURLPath
-		if requestPath != "" {
-			ctx["request_path"] = requestPath
-		}
+	if len(ctx) == 0 {
+		return nil
 	}
-
-	ctx["is_channel_test"] = info.IsChannelTest
 	return ctx
 }

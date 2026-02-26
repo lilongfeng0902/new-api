@@ -48,6 +48,7 @@ const (
 	ContextKeyUserQuota   ContextKey = "user_quota"
 	ContextKeyUserStatus  ContextKey = "user_status"
 	ContextKeyUserEmail   ContextKey = "user_email"
+	ContextKeyUserMobile  ContextKey = "user_mobile"
 	ContextKeyUserGroup   ContextKey = "user_group"
 	ContextKeyUsingGroup  ContextKey = "group"
 	ContextKeyUserName    ContextKey = "username"
@@ -55,8 +56,4 @@ const (
 	ContextKeyLocalCountTokens ContextKey = "local_count_tokens"
 
 	ContextKeySystemPromptOverride ContextKey = "system_prompt_override"
-
-	// ContextKeyAdminRejectReason stores an admin-only reject/block reason extracted from upstream responses.
-	// It is not returned to end users, but can be persisted into consume/error logs for debugging.
-	ContextKeyAdminRejectReason ContextKey = "admin_reject_reason"
 )

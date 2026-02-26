@@ -91,28 +91,16 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3000',
         changeOrigin: true,
       },
       '/mj': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3000',
         changeOrigin: true,
       },
       '/pg': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3000',
         changeOrigin: true,
-      },
-      // Cqtai URL重写：用户访问 /generator/suno 和 /v2/sunoinfo
-      // 实际转发到后端的 /api/cqt/generator/suno 和 /api/cqt/v2/sunoinfo
-      '^/generator/suno': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/generator\/suno/, '/api/cqt/generator/suno'),
-      },
-      '^/v2/sunoinfo': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/v2\/sunoinfo/, '/api/cqt/v2/sunoinfo'),
       },
     },
   },

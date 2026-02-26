@@ -15,14 +15,14 @@ import (
 )
 
 func NotifyRootUser(t string, subject string, content string) {
-	user := model.GetRootUser().ToBaseUser()
-	err := NotifyUser(user.Id, user.Email, user.GetSetting(), dto.NewNotify(t, subject, content, nil))
+	user := model.GetRootUser()
+	err := NotifyUser(user.Id, user.Email, user.Mobile, user.GetSetting(), dto.NewNotify(t, subject, content, nil))
 	if err != nil {
 		common.SysLog(fmt.Sprintf("failed to notify root user: %s", err.Error()))
 	}
 }
 
-func NotifyUser(userId int, userEmail string, userSetting dto.UserSetting, data dto.Notify) error {
+func NotifyUser(userId int, userEmail string, userMobile string, userSetting dto.UserSetting, data dto.Notify) error {
 	notifyType := userSetting.NotifyType
 	if notifyType == "" {
 		notifyType = dto.NotifyTypeEmail
@@ -75,6 +75,16 @@ func NotifyUser(userId int, userEmail string, userSetting dto.UserSetting, data 
 			return nil
 		}
 		return sendGotifyNotify(gotifyUrl, gotifyToken, userSetting.GotifyPriority, data)
+	case dto.NotifyTypeSMS:
+		phoneNumber := userSetting.SMSPhoneNumber
+		if phoneNumber == "" {
+			phoneNumber = userMobile
+		}
+		if phoneNumber == "" {
+			common.SysLog(fmt.Sprintf("user %d has no sms phone number, skip sending sms", userId))
+			return nil
+		}
+		return sendSMSNotify(phoneNumber, data)
 	}
 	return nil
 }
@@ -249,6 +259,28 @@ func sendGotifyNotify(gotifyUrl string, gotifyToken string, priority int, data d
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return fmt.Errorf("gotify request failed with status code: %d", resp.StatusCode)
 		}
+	}
+
+	return nil
+}
+
+func sendSMSNotify(phoneNumber string, data dto.Notify) error {
+	// 处理占位符
+	content := data.Content
+	for _, value := range data.Values {
+		content = strings.Replace(content, dto.ContentValueParam, fmt.Sprintf("%v", value), 1)
+	}
+
+	// 对于短信，我们需要提取关键信息作为模板参数
+	// 这里假设额度告警短信只需要剩余额度信息
+	var remainingQuota string
+	if len(data.Values) > 1 {
+		remainingQuota = fmt.Sprintf("%v", data.Values[1]) // 第二个参数通常是剩余额度
+	}
+
+	err := common.SendQuotaWarningSMS(phoneNumber, remainingQuota)
+	if err != nil {
+		return fmt.Errorf("failed to send sms to %s: %v", phoneNumber, err)
 	}
 
 	return nil

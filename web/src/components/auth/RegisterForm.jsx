@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   API,
@@ -59,7 +59,6 @@ import LinuxDoIcon from '../common/logo/LinuxDoIcon';
 import WeChatIcon from '../common/logo/WeChatIcon';
 import TelegramLoginButton from 'react-telegram-login/src';
 import { UserContext } from '../../context/User';
-import { StatusContext } from '../../context/Status';
 import { useTranslation } from 'react-i18next';
 import { SiDiscord } from 'react-icons/si';
 
@@ -81,7 +80,6 @@ const RegisterForm = () => {
   });
   const { username, password, password2 } = inputs;
   const [userState, userDispatch] = useContext(UserContext);
-  const [statusState] = useContext(StatusContext);
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
@@ -116,29 +114,25 @@ const RegisterForm = () => {
     localStorage.setItem('aff', affCode);
   }
 
-  const status = useMemo(() => {
-    if (statusState?.status) return statusState.status;
+  const [status] = useState(() => {
     const savedStatus = localStorage.getItem('status');
-    if (!savedStatus) return {};
-    try {
-      return JSON.parse(savedStatus) || {};
-    } catch (err) {
-      return {};
-    }
-  }, [statusState?.status]);
+    return savedStatus ? JSON.parse(savedStatus) : {};
+  });
 
-  const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const [showEmailVerification, setShowEmailVerification] = useState(() => {
+    return status.email_verification ?? false;
+  });
 
   useEffect(() => {
-    setShowEmailVerification(!!status?.email_verification);
-    if (status?.turnstile_check) {
+    setShowEmailVerification(status.email_verification);
+    if (status.turnstile_check) {
       setTurnstileEnabled(true);
       setTurnstileSiteKey(status.turnstile_site_key);
     }
 
     // 从 status 获取用户协议和隐私政策的启用状态
-    setHasUserAgreement(status?.user_agreement_enabled || false);
-    setHasPrivacyPolicy(status?.privacy_policy_enabled || false);
+    setHasUserAgreement(status.user_agreement_enabled || false);
+    setHasPrivacyPolicy(status.privacy_policy_enabled || false);
   }, [status]);
 
   useEffect(() => {
@@ -249,7 +243,7 @@ const RegisterForm = () => {
     setVerificationCodeLoading(true);
     try {
       const res = await API.get(
-        `/api/verification?email=${encodeURIComponent(inputs.email)}&turnstile=${turnstileToken}`,
+        `/api/verification?email=${inputs.email}&turnstile=${turnstileToken}`,
       );
       const { success, message } = res.data;
       if (success) {

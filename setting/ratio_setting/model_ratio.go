@@ -411,17 +411,6 @@ func GetModelPrice(name string, printErr bool) (float64, bool) {
 
 	name = FormatMatchingModelName(name)
 
-	if strings.HasSuffix(name, CompactModelSuffix) {
-		price, ok := modelPriceMap[CompactWildcardModelKey]
-		if !ok {
-			if printErr {
-				common.SysError("model price not found: " + name)
-			}
-			return -1, false
-		}
-		return price, true
-	}
-
 	price, ok := modelPriceMap[name]
 	if !ok {
 		if printErr {
@@ -459,12 +448,6 @@ func GetModelRatio(name string) (float64, bool, string) {
 
 	ratio, ok := modelRatioMap[name]
 	if !ok {
-		if strings.HasSuffix(name, CompactModelSuffix) {
-			if wildcardRatio, ok := modelRatioMap[CompactWildcardModelKey]; ok {
-				return wildcardRatio, true, name
-			}
-			return 0, true, name
-		}
 		return 37.5, operation_setting.SelfUseModeEnabled, name
 	}
 	return ratio, true, name

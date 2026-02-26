@@ -24,6 +24,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
     // 默认配置，如果没有传入配置则显示所有模块
     const defaultModules = {
       home: true,
+      dashboard: true,
       console: true,
       pricing: true,
       docs: true,
@@ -38,6 +39,11 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         text: t('首页'),
         itemKey: 'home',
         to: '/',
+      },
+      {
+        text: t('数据看板'),
+        itemKey: 'dashboard',
+        to: '/dashboard',
       },
       {
         text: t('控制台'),

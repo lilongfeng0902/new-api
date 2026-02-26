@@ -14,6 +14,7 @@ const (
 
 	CqtaiActionMusic  = "MUSIC"
 	CqtaiActionLyrics = "LYRICS"
+	CqtaiActionFetch  = "FETCH"
 
 	TaskActionGenerate          = "generate"
 	TaskActionTextGenerate      = "textGenerate"
@@ -28,6 +29,7 @@ var SunoModel2Action = map[string]string{
 }
 
 var CqtaiModel2Action = map[string]string{
-	"cqtai_music":  CqtaiActionMusic,
-	"cqtai_lyrics": CqtaiActionLyrics,
+	"suno_music":  CqtaiActionMusic,
+	"suno_lyrics": CqtaiActionLyrics,
+	"suno_fetch":  CqtaiActionFetch,
 }

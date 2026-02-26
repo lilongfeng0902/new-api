@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/relay/channel"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -60,43 +61,41 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 			// 检查task字段：lyrics或music
 			if taskType, ok := requestBody["task"].(string); ok {
 				if taskType == "lyrics" {
-					info.Action = "LYRICS"
+					info.Action = constant.CqtaiActionLyrics
 				} else {
-					info.Action = "MUSIC"
+					info.Action = constant.CqtaiActionMusic
 				}
 			} else {
-				info.Action = "MUSIC"
+				info.Action = constant.CqtaiActionMusic
 			}
 		} else {
-			info.Action = "FETCH"
+			info.Action = constant.CqtaiActionFetch
 		}
 	} else {
 		// GET 请求默认为FETCH
-		info.Action = "FETCH"
+		info.Action = constant.CqtaiActionFetch
 	}
 
 	return nil
 }
 
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	// 直接代理模式：原样转发请求路径和query参数
-	// 例如：客户端请求 GET /api/cqt/v2/sunoinfo?id=123&id=456
-	//      转发到: https://api.cqtai.com/api/cqt/v2/sunoinfo?id=123&id=456
+	// 路径转换：前端隐藏 cqt 标识，转发到上游时加上
+	// 客户端请求 GET /api/v2/sunoinfo?id=123&id=456
+	// 转发到: https://api.cqtai.com/api/cqt/v2/sunoinfo?id=123&id=456
 	baseURL := info.ChannelBaseUrl
 	requestPath := info.RequestURLPath
 
-	// 添加调试日志
-	if common.DebugEnabled {
-		common.SysLog(fmt.Sprintf("[Cqtai Debug] BuildRequestURL: baseURL=%s, requestPath=%s",
-			baseURL, requestPath))
+	// 路径转换：将 /api/generator/suno 和 /api/v2/sunoinfo 转换为带 /api/cqt/ 前缀的路径
+	// 注意：RequestURLPath 可能包含 query 参数，如 /api/v2/sunoinfo?id=123
+	if strings.HasPrefix(requestPath, "/api/generator/suno") {
+		requestPath = strings.Replace(requestPath, "/api/generator/suno", "/api/cqt/generator/suno", 1)
+	} else if strings.HasPrefix(requestPath, "/api/v2/sunoinfo") {
+		requestPath = strings.Replace(requestPath, "/api/v2/sunoinfo", "/api/cqt/v2/sunoinfo", 1)
 	}
 
 	// RequestURLPath 已经包含了query参数
 	fullRequestURL := fmt.Sprintf("%s%s", baseURL, requestPath)
-
-	if common.DebugEnabled {
-		common.SysLog(fmt.Sprintf("[Cqtai Debug] BuildRequestURL result: %s", fullRequestURL))
-	}
 
 	return fullRequestURL, nil
 }

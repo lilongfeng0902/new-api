@@ -268,6 +268,8 @@ func migrateDB() error {
 		&TwoFA{},
 		&TwoFABackupCode{},
 		&Checkin{},
+		&SmsCode{},
+		&SmsLog{},
 	)
 	if err != nil {
 		return err

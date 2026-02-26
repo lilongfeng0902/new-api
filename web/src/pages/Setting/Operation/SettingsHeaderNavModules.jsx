@@ -41,6 +41,7 @@ export default function SettingsHeaderNavModules(props) {
   // 顶栏模块管理状态
   const [headerNavModules, setHeaderNavModules] = useState({
     home: true,
+    dashboard: true,
     console: true,
     pricing: {
       enabled: true,
@@ -81,6 +82,7 @@ export default function SettingsHeaderNavModules(props) {
   function resetHeaderNavModules() {
     const defaultModules = {
       home: true,
+      dashboard: true,
       console: true,
       pricing: {
         enabled: true,
@@ -166,6 +168,11 @@ export default function SettingsHeaderNavModules(props) {
       key: 'home',
       title: t('首页'),
       description: t('用户主页，展示系统信息'),
+    },
+    {
+      key: 'dashboard',
+      title: t('数据看板'),
+      description: t('系统数据统计，无需登录即可查看'),
     },
     {
       key: 'console',

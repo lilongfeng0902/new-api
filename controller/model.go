@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/lingyiwanwu"
 	"github.com/QuantumNous/new-api/relay/channel/minimax"
 	"github.com/QuantumNous/new-api/relay/channel/moonshot"
+	taskcqtai "github.com/QuantumNous/new-api/relay/channel/task/cqtai"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -85,6 +86,14 @@ func init() {
 			Object:  "model",
 			Created: 1626777600,
 			OwnedBy: "midjourney",
+		})
+	}
+	for _, modelName := range taskcqtai.ModelList {
+		openAIModels = append(openAIModels, dto.OpenAIModels{
+			Id:      modelName,
+			Object:  "model",
+			Created: 1626777600,
+			OwnedBy: taskcqtai.ChannelName,
 		})
 	}
 	openAIModelsMap = make(map[string]dto.OpenAIModels)

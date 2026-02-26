@@ -17,10 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { UserContext } from '../../context/User';
-import { StatusContext } from '../../context/Status';
 import {
   API,
   getLogo,
@@ -39,7 +38,15 @@ import {
   isPasskeySupported,
 } from '../../helpers';
 import Turnstile from 'react-turnstile';
-import { Button, Card, Checkbox, Divider, Form, Icon, Modal } from '@douyinfe/semi-ui';
+import {
+  Button,
+  Card,
+  Checkbox,
+  Divider,
+  Form,
+  Icon,
+  Modal,
+} from '@douyinfe/semi-ui';
 import Title from '@douyinfe/semi-ui/lib/es/typography/title';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
 import TelegramLoginButton from 'react-telegram-login';
@@ -49,13 +56,14 @@ import {
   IconMail,
   IconLock,
   IconKey,
+  IconPhone,
 } from '@douyinfe/semi-icons';
 import OIDCIcon from '../common/logo/OIDCIcon';
 import WeChatIcon from '../common/logo/WeChatIcon';
 import LinuxDoIcon from '../common/logo/LinuxDoIcon';
 import TwoFAVerification from './TwoFAVerification';
 import { useTranslation } from 'react-i18next';
-import { SiDiscord }from 'react-icons/si';
+import { SiDiscord } from 'react-icons/si';
 
 const LoginForm = () => {
   let navigate = useNavigate();
@@ -74,12 +82,23 @@ const LoginForm = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
   const [userState, userDispatch] = useContext(UserContext);
-  const [statusState] = useContext(StatusContext);
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
   const [showEmailLogin, setShowEmailLogin] = useState(false);
+  // 默认根据本地缓存的 status 配置决定是否优先显示短信登录
+  const [showSmsLogin, setShowSmsLogin] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return false;
+      const savedStatus = localStorage.getItem('status');
+      if (!savedStatus) return false;
+      const parsed = JSON.parse(savedStatus);
+      return !!parsed.sms_login_enabled;
+    } catch {
+      return false;
+    }
+  });
   const [wechatLoading, setWechatLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
   const [discordLoading, setDiscordLoading] = useState(false);
@@ -94,6 +113,15 @@ const LoginForm = () => {
   const [showTwoFA, setShowTwoFA] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
+  // SMS Login states
+  const [smsLoginInputs, setSmsLoginInputs] = useState({
+    mobile: '',
+    code: '',
+  });
+  const [smsLoginLoading, setSmsLoginLoading] = useState(false);
+  const [smsSendLoading, setSmsSendLoading] = useState(false);
+  const [smsDisableButton, setSmsDisableButton] = useState(false);
+  const [smsCountdown, setSmsCountdown] = useState(60);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [hasUserAgreement, setHasUserAgreement] = useState(false);
   const [hasPrivacyPolicy, setHasPrivacyPolicy] = useState(false);
@@ -110,26 +138,20 @@ const LoginForm = () => {
     localStorage.setItem('aff', affCode);
   }
 
-  const status = useMemo(() => {
-    if (statusState?.status) return statusState.status;
+  const [status] = useState(() => {
     const savedStatus = localStorage.getItem('status');
-    if (!savedStatus) return {};
-    try {
-      return JSON.parse(savedStatus) || {};
-    } catch (err) {
-      return {};
-    }
-  }, [statusState?.status]);
+    return savedStatus ? JSON.parse(savedStatus) : {};
+  });
 
   useEffect(() => {
-    if (status?.turnstile_check) {
+    if (status.turnstile_check) {
       setTurnstileEnabled(true);
       setTurnstileSiteKey(status.turnstile_site_key);
     }
-    
+
     // 从 status 获取用户协议和隐私政策的启用状态
-    setHasUserAgreement(status?.user_agreement_enabled || false);
-    setHasPrivacyPolicy(status?.privacy_policy_enabled || false);
+    setHasUserAgreement(status.user_agreement_enabled || false);
+    setHasPrivacyPolicy(status.privacy_policy_enabled || false);
   }, [status]);
 
   useEffect(() => {
@@ -149,6 +171,18 @@ const LoginForm = () => {
       showError(t('未登录或登录已过期，请重新登录'));
     }
   }, []);
+
+  // SMS countdown effect
+  useEffect(() => {
+    let interval = null;
+    if (smsDisableButton && smsCountdown > 0) {
+      interval = setInterval(() => setSmsCountdown(smsCountdown - 1), 1000);
+    } else if (smsCountdown === 0) {
+      setSmsDisableButton(false);
+      setSmsCountdown(60);
+    }
+    return () => clearInterval(interval);
+  }, [smsDisableButton, smsCountdown]);
 
   const onWeChatLoginClicked = () => {
     if ((hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms) {
@@ -446,6 +480,12 @@ const LoginForm = () => {
     setOtherLoginOptionsLoading(false);
   };
 
+  // 包装的SMS登录返回处理（从短信登录切换回账号密码登录）
+  const handleSmsBackClick = () => {
+    setShowSmsLogin(false);
+    setShowEmailLogin(true);
+  };
+
   // 2FA验证成功处理
   const handle2FASuccess = (data) => {
     userDispatch({ type: 'login', payload: data });
@@ -459,6 +499,79 @@ const LoginForm = () => {
   const handleBackToLogin = () => {
     setShowTwoFA(false);
     setInputs({ username: '', password: '', wechat_verification_code: '' });
+  };
+
+  // SMS login handlers
+  const handleSmsInputChange = (field, value) => {
+    setSmsLoginInputs(prevInputs => ({
+      ...prevInputs,
+      [field]: value,
+    }));
+  };
+
+  const sendSmsCode = async () => {
+    if (!smsLoginInputs.mobile || smsLoginInputs.mobile.length !== 11) {
+      showError(t('请输入有效的11位手机号'));
+      return;
+    }
+
+    setSmsSendLoading(true);
+    try {
+      const res = await API.post('/api/user/send-sms-code', {
+        mobile: smsLoginInputs.mobile,
+        turnstile_token: turnstileToken,
+      });
+      const { success, message, data } = res.data;
+      if (success) {
+        showSuccess(t('验证码已发送'));
+        setSmsDisableButton(true);
+        setSmsCountdown(data?.expire_minutes ? data.expire_minutes * 60 : 60);
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setSmsSendLoading(false);
+    }
+  };
+
+  const handleSmsLogin = async () => {
+    if (!smsLoginInputs.mobile || !smsLoginInputs.code) {
+      showError(t('请输入手机号和验证码'));
+      return;
+    }
+
+    setSmsLoginLoading(true);
+    try {
+      const res = await API.post('/api/user/sms-login', {
+        mobile: smsLoginInputs.mobile,
+        code: smsLoginInputs.code,
+        turnstile_token: turnstileToken,
+      });
+      const { success, message, data } = res.data;
+      if (success) {
+        userDispatch({ type: 'login', payload: data });
+        setUserData(data);
+        updateAPI();
+
+        showSuccess(t('登录成功'));
+        setShowSmsLogin(false);
+
+        const redirectUrl = searchParams.get('redirect');
+        if (redirectUrl) {
+          navigate(redirectUrl);
+        } else {
+          navigate('/');
+        }
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setSmsLoginLoading(false);
+    }
   };
 
   const renderOAuthOptions = () => {
@@ -514,7 +627,15 @@ const LoginForm = () => {
                     theme='outline'
                     className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
                     type='tertiary'
-                    icon={<SiDiscord style={{ color: '#5865F2', width: '20px', height: '20px' }} />}
+                    icon={
+                      <SiDiscord
+                        style={{
+                          color: '#5865F2',
+                          width: '20px',
+                          height: '20px',
+                        }}
+                      />
+                    }
                     onClick={handleDiscordClick}
                     loading={discordLoading}
                   >
@@ -592,6 +713,18 @@ const LoginForm = () => {
                 >
                   <span className='ml-3'>{t('使用 邮箱或用户名 登录')}</span>
                 </Button>
+
+                {status.sms_login_enabled && (
+                  <Button
+                    theme='outline'
+                    className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
+                    type='tertiary'
+                    icon={<IconPhone size='large' />}
+                    onClick={() => setShowSmsLogin(true)}
+                  >
+                    <span className='ml-3'>{t('使用 手机号 登录')}</span>
+                  </Button>
+                )}
               </div>
 
               {(hasUserAgreement || hasPrivacyPolicy) && (
@@ -626,13 +759,14 @@ const LoginForm = () => {
                             {t('隐私政策')}
                           </a>
                         </>
-                        )}
-                      </Text>
-                    </Checkbox>
-                  </div>
-                )}
+                      )}
+                    </Text>
+                  </Checkbox>
+                </div>
+              )}
 
-              {!status.self_use_mode_enabled && (
+              {/* 暂时隐藏注册入口：没有账户？注册 */}
+              {/* {!status.self_use_mode_enabled && status.register_enabled && (
                 <div className='mt-6 text-center text-sm'>
                   <Text>
                     {t('没有账户？')}{' '}
@@ -644,7 +778,7 @@ const LoginForm = () => {
                     </Link>
                   </Text>
                 </div>
-              )}
+              )} */}
             </div>
           </Card>
         </div>
@@ -746,10 +880,24 @@ const LoginForm = () => {
                     htmlType='submit'
                     onClick={handleSubmit}
                     loading={loginLoading}
-                    disabled={(hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms}
+                    disabled={
+                      (hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms
+                    }
                   >
                     {t('继续')}
                   </Button>
+
+                  {status.sms_login_enabled && (
+                    <Button
+                      theme='outline'
+                      className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
+                      type='tertiary'
+                      icon={<IconPhone size='large' />}
+                      onClick={() => setShowSmsLogin(true)}
+                    >
+                      <span className='ml-3'>{t('使用 手机号和验证码 登录')}</span>
+                    </Button>
+                  )}
 
                   <Button
                     theme='borderless'
@@ -788,7 +936,8 @@ const LoginForm = () => {
                 </>
               )}
 
-              {!status.self_use_mode_enabled && (
+              {/* 暂时隐藏注册入口：没有账户？注册（邮箱登录表单底部） */}
+              {/* {!status.self_use_mode_enabled && status.register_enabled && (
                 <div className='mt-6 text-center text-sm'>
                   <Text>
                     {t('没有账户？')}{' '}
@@ -800,8 +949,153 @@ const LoginForm = () => {
                     </Link>
                   </Text>
                 </div>
-              )}
+              )} */}
             </div>
+          </Card>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSmsLoginForm = () => {
+    return (
+      <div className='flex flex-col items-center'>
+        <div className='w-full max-w-md'>
+          <div className='flex items-center justify-center mb-6 gap-2'>
+            <img src={logo} alt='Logo' className='h-10 rounded-full' />
+            <Title heading={3}>{systemName}</Title>
+          </div>
+
+          <Card className='border-0 !rounded-2xl overflow-hidden'>
+            <div className='flex justify-center pt-6 pb-2'>
+              <Title heading={3} className='text-gray-800 dark:text-gray-200'>
+                {t('手机号登录')}
+              </Title>
+            </div>
+            <div className='px-2 py-8'>
+              <Form className='space-y-3'>
+                {/* 手机号输入 */}
+                <Form.Input
+                  field='mobile'
+                  label={t('手机号')}
+                  placeholder={t('请输入11位手机号')}
+                  name='mobile'
+                  value={smsLoginInputs.mobile}
+                  onChange={(value) => handleSmsInputChange('mobile', value)}
+                  prefix={<IconPhone />}
+                  maxLength={11}
+                />
+
+                {/* 验证码输入 + 发送按钮（与手机号表单风格保持一致） */}
+                <Form.Input
+                  field='code'
+                  label={t('验证码')}
+                  placeholder={t('请输入验证码')}
+                  value={smsLoginInputs.code}
+                  onChange={(value) => handleSmsInputChange('code', value)}
+                  prefix={<IconKey />}
+                  maxLength={6}
+                  suffix={
+                    <Button
+                      onClick={sendSmsCode}
+                      disabled={smsDisableButton || smsSendLoading}
+                      type='primary'
+                      theme='outline'
+                      loading={smsSendLoading}
+                      style={{ padding: '0 12px' }}
+                    >
+                      {smsDisableButton
+                        ? `${smsCountdown}s`
+                        : t('获取验证码')}
+                    </Button>
+                  }
+                />
+
+                {/* Turnstile 验证（可选） */}
+                {turnstileEnabled && (
+                  <div className='flex justify-center pt-2'>
+                    <Turnstile
+                      sitekey={turnstileSiteKey}
+                      onVerify={(token) => setTurnstileToken(token)}
+                    />
+                  </div>
+                )}
+
+                {/* 用户协议（可选） */}
+                {(hasUserAgreement || hasPrivacyPolicy) && (
+                  <div className='pt-4'>
+                    <Checkbox
+                      checked={agreedToTerms}
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    >
+                      <Text size='small' className='text-gray-600'>
+                        {t('我已阅读并同意')}
+                        {hasUserAgreement && (
+                          <a
+                            href='/user-agreement'
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className='text-blue-600 hover:text-blue-800 mx-1'
+                          >
+                            {t('用户协议')}
+                          </a>
+                        )}
+                        {hasUserAgreement && hasPrivacyPolicy && t('和')}
+                        {hasPrivacyPolicy && (
+                          <a
+                            href='/privacy-policy'
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className='text-blue-600 hover:text-blue-800 mx-1'
+                          >
+                            {t('隐私政策')}
+                          </a>
+                        )}
+                      </Text>
+                    </Checkbox>
+                  </div>
+                )}
+
+                {/* 操作按钮 */}
+                <div className='space-y-2 pt-2'>
+                  <Button
+                    theme='solid'
+                    className='w-full !rounded-full'
+                    type='primary'
+                    onClick={handleSmsLogin}
+                    loading={smsLoginLoading}
+                    disabled={(hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms}
+                  >
+                    {t('登录')}
+                  </Button>
+
+                  {/* 切换为账号密码登录 */}
+                  <Button
+                    theme='borderless'
+                    type='tertiary'
+                    className='w-full !rounded-full'
+                    onClick={handleSmsBackClick}
+                  >
+                    {t('使用 邮箱或用户名 登录')}
+                  </Button>
+                </div>
+              </Form>
+            </div>
+
+            {/* 暂时隐藏注册入口：没有账户？注册（短信登录表单底部） */}
+            {/* {!status.self_use_mode_enabled && status.register_enabled && (
+              <div className='pb-6 text-center text-sm'>
+                <Text>
+                  {t('没有账户？')}{' '}
+                  <Link
+                    to='/register'
+                    className='text-blue-600 hover:text-blue-800 font-medium'
+                  >
+                    {t('注册')}
+                  </Link>
+                </Text>
+              </div>
+            )} */}
           </Card>
         </div>
       </div>
@@ -897,16 +1191,18 @@ const LoginForm = () => {
         style={{ top: '50%', left: '-120px' }}
       />
       <div className='w-full max-w-sm mt-[60px]'>
-        {showEmailLogin ||
-        !(
-          status.github_oauth ||
-          status.discord_oauth ||
-          status.oidc_enabled ||
-          status.wechat_login ||
-          status.linuxdo_oauth ||
-          status.telegram_oauth
-        )
-          ? renderEmailLoginForm()
+        {showSmsLogin
+          ? renderSmsLoginForm() // 优先显示 SMS 登录
+          : showEmailLogin ||
+            !(
+              status.github_oauth ||
+              status.discord_oauth ||
+              status.oidc_enabled ||
+              status.wechat_login ||
+              status.linuxdo_oauth ||
+              status.telegram_oauth
+            )
+          ? renderEmailLoginForm() // 其次显示邮箱登录
           : renderOAuthOptions()}
         {renderWeChatLoginModal()}
         {render2FAModal()}
